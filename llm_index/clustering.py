@@ -199,14 +199,9 @@ class EnhancedClusteringEngine:
     def _community_detection_fallback(self, G: nx.Graph) -> List[List[str]]:
         """Fallback community detection when spectral clustering fails."""
         try:
-            # Use Louvain community detection if available
-            if hasattr(nx, 'community') and hasattr(nx.community, 'louvain_communities'):
-                communities = nx.community.louvain_communities(G, seed=42)
-                return [list(community) for community in communities]
-            else:
-                # Simple connected components
-                components = list(nx.connected_components(G))
-                return [list(component) for component in components]
+            # Use connected components
+            components = list(nx.connected_components(G))
+            return [list(component) for component in components]
         except Exception as e:
             logger.error(f"Community detection fallback failed: {e}")
             return self._fallback_clustering(list(G.nodes()))
@@ -262,28 +257,10 @@ class EnhancedClusteringEngine:
         if len(large_cluster) <= self.max_cluster_size:
             return [large_cluster]
             
-        # Create subgraph
-        subgraph = G.subgraph(large_cluster)
-        
-        # Apply recursive spectral clustering on subgraph
-        try:
-            n_splits = math.ceil(len(large_cluster) / self.max_cluster_size)
-            sub_clusters = self._spectral_clustering(subgraph, large_cluster)
-            
-            # If spectral clustering didn't split enough, use simple partitioning
-            if len(sub_clusters) < n_splits:
-                chunk_size = self.max_cluster_size
-                sub_clusters = [large_cluster[i:i + chunk_size] 
-                              for i in range(0, len(large_cluster), chunk_size)]
-            
-            return sub_clusters
-            
-        except Exception as e:
-            logger.warning(f"Cluster splitting failed: {e}")
-            # Simple chunking fallback
-            chunk_size = self.max_cluster_size
-            return [large_cluster[i:i + chunk_size] 
-                   for i in range(0, len(large_cluster), chunk_size)]
+        # Simple chunking fallback
+        chunk_size = self.max_cluster_size
+        return [large_cluster[i:i + chunk_size] 
+               for i in range(0, len(large_cluster), chunk_size)]
     
     def _merge_small_clusters(self, clusters: List[List[str]], G: nx.Graph) -> List[List[str]]:
         """Merge remaining small clusters."""
@@ -356,9 +333,6 @@ class EnhancedClusteringEngine:
             # Modularity
             modularity = self._calculate_modularity(clusters, G)
             
-            # Silhouette coefficient approximation
-            silhouette = self._calculate_clustering_silhouette(clusters, G)
-            
             # Intra-cluster density
             intra_density = self._calculate_average_intra_cluster_density(clusters, G)
             
@@ -370,7 +344,6 @@ class EnhancedClusteringEngine:
             
             return {
                 'modularity': modularity,
-                'silhouette': silhouette,
                 'intra_density': intra_density,
                 'inter_separation': inter_separation,
                 'size_balance': size_balance,
@@ -411,45 +384,6 @@ class EnhancedClusteringEngine:
         
         return modularity / (2 * m)
     
-    def _calculate_clustering_silhouette(self, clusters: List[List[str]], G: nx.Graph) -> float:
-        """Calculate approximate silhouette coefficient for graph clustering."""
-        if len(clusters) <= 1:
-            return 0.0
-            
-        node_to_cluster = {}
-        for i, cluster in enumerate(clusters):
-            for node in cluster:
-                node_to_cluster[node] = i
-        
-        silhouette_scores = []
-        
-        for node in G.nodes():
-            cluster_id = node_to_cluster[node]
-            
-            # Average distance to nodes in same cluster
-            same_cluster_nodes = [n for n in clusters[cluster_id] if n != node]
-            if same_cluster_nodes:
-                a = np.mean([1.0 / (G[node][neighbor].get('weight', 1.0) + 1e-6) 
-                           for neighbor in same_cluster_nodes if G.has_edge(node, neighbor)])
-            else:
-                a = 0.0
-            
-            # Average distance to nodes in nearest other cluster
-            other_cluster_distances = []
-            for i, other_cluster in enumerate(clusters):
-                if i != cluster_id:
-                    distances = [1.0 / (G[node][neighbor].get('weight', 1.0) + 1e-6)
-                               for neighbor in other_cluster if G.has_edge(node, neighbor)]
-                    if distances:
-                        other_cluster_distances.append(np.mean(distances))
-            
-            if other_cluster_distances:
-                b = min(other_cluster_distances)
-                if max(a, b) > 0:
-                    silhouette_scores.append((b - a) / max(a, b))
-        
-        return np.mean(silhouette_scores) if silhouette_scores else 0.0
-    
     def _calculate_average_intra_cluster_density(self, clusters: List[List[str]], G: nx.Graph) -> float:
         """Calculate average density within clusters."""
         densities = []
@@ -468,7 +402,7 @@ class EnhancedClusteringEngine:
         return np.mean(densities) if densities else 0.0
     
     def _calculate_inter_cluster_separation(self, clusters: List[List[str]], G: nx.Graph) -> float:
-        """Calculate separation between clusters (lower is better separation)."""
+        """Calculate separation between clusters."""
         if len(clusters) < 2:
             return 1.0
             
@@ -489,7 +423,7 @@ class EnhancedClusteringEngine:
         return total_inter_edges / total_possible_inter if total_possible_inter > 0 else 0.0
     
     def _calculate_size_balance(self, clusters: List[List[str]]) -> float:
-        """Calculate how balanced the cluster sizes are (1.0 = perfectly balanced)."""
+        """Calculate how balanced the cluster sizes are."""
         if not clusters:
             return 0.0
             
@@ -499,10 +433,10 @@ class EnhancedClusteringEngine:
         if mean_size == 0:
             return 1.0
             
-        # Coefficient of variation (lower is more balanced)
+        # Coefficient of variation
         cv = np.std(sizes) / mean_size
         
-        # Convert to balance score (1.0 = perfectly balanced, 0.0 = very imbalanced)
+        # Convert to balance score
         return 1.0 / (1.0 + cv)
     
     def _fallback_clustering(self, files: List[str]) -> List[List[str]]:
@@ -515,20 +449,19 @@ def cluster_files(dep_graph: Dict[str, List[str]], max_cluster_size: int = 12,
                  complexity_scores: Optional[Dict[str, float]] = None) -> List[List[str]]:
     """
     Enhanced clustering function using mathematical optimization.
-    
-    Args:
-        dep_graph: File dependency graph
-        max_cluster_size: Maximum files per cluster
-        complexity_scores: Optional complexity scores for files
-        
-    Returns:
-        Optimized file clusters
     """
-    engine = EnhancedClusteringEngine(max_cluster_size=max_cluster_size)
-    clusters = engine.cluster_files(dep_graph, complexity_scores)
-    
-    # Log quality metrics
-    if hasattr(engine, 'quality_metrics') and engine.quality_metrics:
-        logger.info(f"Clustering quality: {engine.quality_metrics}")
-    
-    return clusters
+    try:
+        engine = EnhancedClusteringEngine(max_cluster_size=max_cluster_size)
+        clusters = engine.cluster_files(dep_graph, complexity_scores)
+        
+        # Log quality metrics
+        if hasattr(engine, 'quality_metrics') and engine.quality_metrics:
+            logger.info(f"Clustering quality: {engine.quality_metrics}")
+        
+        return clusters
+    except Exception as e:
+        logger.error(f"Enhanced clustering failed: {e}")
+        # Fallback to simple clustering
+        chunk_size = max_cluster_size
+        files = list(dep_graph.keys())
+        return [files[i:i + chunk_size] for i in range(0, len(files), chunk_size)]
