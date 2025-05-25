@@ -1,0 +1,7 @@
+networkx
+numpy
+scikit-learn
+chardet
+rope
+esprima
+clamd
