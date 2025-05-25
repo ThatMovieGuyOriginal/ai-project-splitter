@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from 'react';
 import Link from "next/link";
 
 interface AnalysisResult {
@@ -118,40 +118,72 @@ function GitHubImport() {
 }
 
 function ClusterGraph({ clusters, depGraph }: { clusters: string[][], depGraph: Record<string, string[]> }) {
-  // Simple Cytoscape integration for clusters
-  // (See "public/cytoscape.min.js" included in file tree)
-  // Production: load only if clusters exist.
+  useEffect(() => {
+    // Load Cytoscape from CDN
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js';
+    script.onload = () => {
+      // Initialize graph after Cytoscape loads
+      if (window.cytoscape && clusters) {
+        const cy = window.cytoscape({
+          container: document.getElementById('cy-graph'),
+          elements: [
+            // Nodes
+            ...clusters.flatMap((cluster: string[], idx: number) =>
+              cluster.map((file: string) => ({
+                data: { id: file, label: file.split('/').pop(), group: idx }
+              }))
+            ),
+            // Edges
+            ...Object.entries(depGraph).flatMap(([src, tgts]: [string, string[]]) =>
+              tgts.map((tgt: string) => ({
+                data: { source: src, target: tgt }
+              }))
+            )
+          ],
+          style: [
+            { 
+              selector: 'node', 
+              style: { 
+                'background-color': '#5ba', 
+                'label': 'data(label)',
+                'text-valign': 'center',
+                'color': 'white',
+                'text-outline-width': 2,
+                'text-outline-color': '#5ba'
+              } 
+            },
+            { 
+              selector: 'edge', 
+              style: { 
+                'width': 2, 
+                'line-color': '#ccc',
+                'target-arrow-color': '#ccc',
+                'target-arrow-shape': 'triangle'
+              } 
+            }
+          ],
+          layout: { name: 'cose', animate: true, randomize: false }
+        });
+      }
+    };
+    document.head.appendChild(script);
+
+    // Cleanup
+    return () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, [clusters, depGraph]);
+
   if (typeof window === 'undefined' || !clusters) return null;
   
-  // Use effect to render cytoscape graph after mount
   return (
-    <div id="cy-graph" style={{ width: 600, height: 400, margin: '1em auto' }}>
-      {/* Visualization handled client-side */}
-      <script dangerouslySetInnerHTML={{
-        __html: `
-          if (window.cytoscape) {
-            const cy = cytoscape({
-              container: document.getElementById('cy-graph'),
-              elements: [
-                ${clusters.map((cluster: string[], idx: number) =>
-                  cluster.map((file: string) =>
-                    `{ data: { id: '${file}', label: '${file}', group: ${idx} } }`
-                  ).join(',')
-                ).join(',')},
-                ${Object.entries(depGraph).flatMap(([src, tgts]: [string, string[]]) =>
-                  tgts.map((tgt: string) =>
-                    `{ data: { source: '${src}', target: '${tgt}' } }`
-                  )).join(',')}
-              ],
-              style: [
-                { selector: 'node', style: { 'background-color': '#5ba', 'label': 'data(label)' } },
-                { selector: 'edge', style: { 'width': 2, 'line-color': '#ccc' } }
-              ],
-              layout: { name: 'cose', animate: true }
-            });
-          }
-        `
-      }} />
+    <div id="cy-graph" style={{ width: 600, height: 400, margin: '1em auto', border: '1px solid #ddd' }}>
+      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+        Loading visualization...
+      </div>
     </div>
   );
 }
