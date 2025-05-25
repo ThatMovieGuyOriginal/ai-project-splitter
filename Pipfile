@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+networkx = ">=3.0,<4.0"
+numpy = ">=1.21.0,<3.0"
+scikit-learn = ">=1.0.0,<2.0"
+chardet = ">=5.0.0,<6.0"
+werkzeug = ">=3.0.0,<4.0"
+
+[requires]
+python_version = "3.12"
