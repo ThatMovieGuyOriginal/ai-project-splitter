@@ -19,6 +19,7 @@ See `/privacy` and `/legal` for our privacy policy and terms.
 - Deploys instantly to Vercel
 
 
+```
 /
 ├── api/ # Python serverless API endpoints (Vercel)
 │ ├── analyze.py
@@ -54,3 +55,4 @@ See `/privacy` and `/legal` for our privacy policy and terms.
 ├── requirements.txt # Python dependencies for API/serverless
 ├── vercel.json # Vercel project configuration
 ├── README.md
+```
