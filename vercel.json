@@ -1,7 +1,11 @@
 {
   "builds": [
     {
-      "src": "api/*.py",
+      "src": "package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "api/**/*.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "15mb",
@@ -13,6 +17,18 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
-  ]
+  ],
+  "functions": {
+    "pages/**/*.tsx": {
+      "runtime": "@vercel/next"
+    },
+    "api/**/*.py": {
+      "runtime": "python3.9"
+    }
+  }
 }
