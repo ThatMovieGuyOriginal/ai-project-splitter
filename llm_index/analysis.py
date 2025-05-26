@@ -1,3 +1,4 @@
+# llm_index/analysis.py
 import os, ast, re, chardet
 from typing import Dict, Set, List
 from llm_index.constants import IGNORE_DIRS, MAX_FILES_PER_PROJECT
