@@ -336,7 +336,7 @@ class TechnicalDebtAnalyzer:
                 'effort': 'hours'
             },
             'LONG_LINE': {
-                'pattern': r'^.{120,},
+                'pattern': r'^.{120,}$',
                 'severity': 'low',
                 'category': 'maintainability',
                 'description': 'Line exceeds recommended length',
