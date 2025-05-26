@@ -2,6 +2,12 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 
+declare global {
+  interface Window {
+    cytoscape: any;
+  }
+}
+
 interface AnalysisResult {
   dep_graph: Record<string, string[]>;
   clusters: string[][];
