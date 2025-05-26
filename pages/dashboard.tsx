@@ -6,7 +6,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-// dash
+
   async function dryRun(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
