@@ -1,8 +1,4 @@
-# api/analyze.py
 import tempfile, os, json, shutil
-from werkzeug.wrappers import Request, Response
-from werkzeug.utils import secure_filename
-import cgi
 from llm_index.analysis import analyze_project_enhanced
 from llm_index.reporting import generate_report
 from llm_index.clustering import cluster_files
@@ -13,51 +9,56 @@ import time
 
 logger = logging.getLogger('llm-index.api.analyze')
 
-def handler(request, response):
+def handler(request):
     if request.method == 'OPTIONS':
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        }
     
     if request.method != 'POST':
-        response.status_code = 405
-        response.data = json.dumps({'error': 'Method not allowed'})
-        return response
+        return {
+            'statusCode': 405,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': 'Method not allowed'})
+        }
     
     tempdir, sid = None, None
     start_time = time.time()
     
     try:
-        # Check content type
-        content_type = request.headers.get('Content-Type', '')
-        if not content_type.startswith('multipart/form-data'):
-            response.status_code = 400
-            response.data = json.dumps({'error': 'Content-Type must be multipart/form-data'})
-            return response
-
-        # Get uploaded file
-        files = request.files.getlist('file')
+        # Get uploaded file from form data
+        files = request.files.getlist('file') if hasattr(request, 'files') else []
         if not files or not files[0]:
-            response.status_code = 400
-            response.data = json.dumps({'error': 'No file uploaded'})
-            return response
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'No file uploaded'})
+            }
 
         file_item = files[0]
         if not file_item.filename:
-            response.status_code = 400
-            response.data = json.dumps({'error': 'No file uploaded'})
-            return response
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'No file uploaded'})
+            }
 
-        # Validate file size (5MB limit for performance)
-        file_item.seek(0, 2)  # Seek to end
+        # Validate file size (5MB limit)
+        file_item.seek(0, 2)
         file_size = file_item.tell()
-        file_item.seek(0)  # Reset to beginning
+        file_item.seek(0)
         
-        if file_size > 5 * 1024 * 1024:  # 5MB
-            response.status_code = 413
-            response.data = json.dumps({'error': 'File too large. Maximum size is 5MB.'})
-            return response
+        if file_size > 5 * 1024 * 1024:
+            return {
+                'statusCode': 413,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'File too large. Maximum size is 5MB.'})
+            }
 
         tempdir, sid = unique_tempdir()
         validate_archive_extension(file_item.filename)
@@ -71,9 +72,11 @@ def handler(request, response):
             shutil.unpack_archive(zip_path, tempdir)
         except Exception as e:
             logger.error(f"Archive extraction failed: {e}")
-            response.status_code = 400
-            response.data = json.dumps({'error': 'Failed to extract archive. Please check file format.'})
-            return response
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Failed to extract archive. Please check file format.'})
+            }
         
         # Security scan
         scan_for_malware(tempdir)
@@ -81,7 +84,7 @@ def handler(request, response):
         logger.info("Starting enhanced project analysis")
         
         # Check execution time to avoid timeout
-        if time.time() - start_time > 8:  # 8 seconds safety margin
+        if time.time() - start_time > 8:
             raise TimeoutError("Analysis taking too long")
         
         # Use enhanced analysis with fallback
@@ -97,7 +100,7 @@ def handler(request, response):
             complexity_scores = {}
             debt_analysis = {}
         
-        # Enhanced clustering with lightweight implementation
+        # Enhanced clustering
         clusters = cluster_files(dep_graph, complexity_scores=complexity_scores)
         
         # Generate report
@@ -126,47 +129,46 @@ def handler(request, response):
         
         logger.info(f"Analysis complete: {len(clusters)} clusters, {processing_time:.2f}s")
         
-        response.status_code = 200
-        response.headers['Content-Type'] = 'application/json'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.data = json.dumps(response_data)
-        return response
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps(response_data)
+        }
         
     except TimeoutError:
         logger.error("Analysis timeout")
-        response.status_code = 408
-        response.headers['Content-Type'] = 'application/json'
-        response.data = json.dumps({
-            'error': 'Analysis timeout. Please try a smaller project or contact support.',
-            'status': 'timeout'
-        })
-        return response
+        return {
+            'statusCode': 408,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'error': 'Analysis timeout. Please try a smaller project or contact support.',
+                'status': 'timeout'
+            })
+        }
     except MemoryError:
         logger.error("Analysis out of memory")
-        response.status_code = 413
-        response.headers['Content-Type'] = 'application/json'
-        response.data = json.dumps({
-            'error': 'Project too large to analyze. Please try a smaller subset.',
-            'status': 'memory_limit'
-        })
-        return response
+        return {
+            'statusCode': 413,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'error': 'Project too large to analyze. Please try a smaller subset.',
+                'status': 'memory_limit'
+            })
+        }
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
-        response.status_code = 500
-        response.headers['Content-Type'] = 'application/json'
-        response.data = json.dumps({
-            'error': str(e),
-            'status': 'failed',
-            'processing_time_seconds': round(time.time() - start_time, 2) if start_time else 0
-        })
-        return response
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'error': str(e),
+                'status': 'failed',
+                'processing_time_seconds': round(time.time() - start_time, 2) if start_time else 0
+            })
+        }
     finally:
         if sid:
             cleanup_tempdir(sid)
-
-# Vercel Python runtime handler
-def main(request):
-    from werkzeug.wrappers import Request, Response
-    req = Request(request.environ)
-    resp = Response()
-    return handler(req, resp)
