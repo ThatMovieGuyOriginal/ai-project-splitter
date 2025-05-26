@@ -1,3 +1,4 @@
+# llm_index/constants.py
 import os
 
 # Directories to always ignore in analysis, refactor, and backup
