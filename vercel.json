@@ -1,14 +1,25 @@
 {
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "@vercel/python",
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "src": "package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
