@@ -331,7 +331,7 @@ function ClusterVisualization({ clusters, depGraph }: {
             deps.map(dep => {
               // Find actual target files
               const targets = clusters.flat().filter(file => 
-                dep in file || file.endsWith(`${dep}.py`) || file.endsWith(`${dep}.js`)
+                file.includes(dep) || file.endsWith(`${dep}.py`) || file.endsWith(`${dep}.js`)
               );
               return targets.map(target => ({
                 data: { source: src, target: target }
