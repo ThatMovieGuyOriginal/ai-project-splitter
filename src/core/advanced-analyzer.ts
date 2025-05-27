@@ -711,12 +711,17 @@ export class AdvancedCodeAnalyzer {
       () => this.modularityClustering(nodes, adjacencyMatrix)
     ];
     
-    const results = await Promise.all(algorithms.map(algo => 
-      algo().catch(() => this.fallbackClustering(nodes))
-    ));
+    const results = await Promise.allSettled(algorithms.map(algo => algo()));
+    const validResults = results
+      .filter(result => result.status === 'fulfilled')
+      .map(result => (result as PromiseFulfilledResult<ClusterResult[]>).value);
+    
+    if (validResults.length === 0) {
+      return this.fallbackClustering(nodes);
+    }
     
     // Select best clustering based on modularity and silhouette score
-    return results.reduce((best, current) => {
+    return validResults.reduce((best, current) => {
       const bestScore = this.evaluateClusteringQuality(best, nodes, adjacencyMatrix);
       const currentScore = this.evaluateClusteringQuality(current, nodes, adjacencyMatrix);
       return currentScore > bestScore ? current : best;
