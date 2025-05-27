@@ -1492,7 +1492,7 @@ export class AdvancedCodeAnalyzer {
     
     // Count operators
     for (const op of langOperators) {
-      const regex = new RegExp(`\\${op.replace(/[.*+?^${}()|[\]\\]/g, '\\    // Language-specific operator patterns
+      const regex = new RegExp(`\\${op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
     const operatorPatterns: Record<string, string[]> = {
       javascript: ['+', '-', '*', '/', '%',')}`, 'g');
       const matches = content.match(regex);
@@ -1514,4 +1514,4 @@ export class AdvancedCodeAnalyzer {
 }
 
 // Export additional interfaces for use in other modules
-export type { ComplexityMetrics, GraphNode, ClusterResult, ProjectAnalysis };// src/core/advanced-analyzer.ts
+export type { ComplexityMetrics, GraphNode, ClusterResult, ProjectAnalysis };
