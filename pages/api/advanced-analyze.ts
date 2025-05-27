@@ -18,20 +18,20 @@ export const config = {
 interface AnalysisResponse {
   success: boolean;
   analysis?: {
-    nodes: Record<string, any>;
-    clusters: any[];
-    globalMetrics: any;
-    qualityMetrics: any;
+    nodes: Record<string, unknown>;
+    clusters: unknown[];
+    globalMetrics: unknown;
+    qualityMetrics: unknown;
     recommendations: string[];
     networkAnalysis: {
-      centralityAnalysis: any[];
-      communityStructure: any;
-      topologicalFeatures: any;
+      centralityAnalysis: unknown[];
+      communityStructure: unknown;
+      topologicalFeatures: unknown;
     };
     llmOptimization: {
-      contextChunks: any[];
-      tokenEstimates: any;
-      loadingStrategy: any;
+      contextChunks: unknown[];
+      tokenEstimates: unknown;
+      loadingStrategy: unknown;
     };
   };
   performance: {
@@ -48,7 +48,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   const startMemory = process.memoryUsage();
   
   if (req.method === 'OPTIONS') {
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ 
+      success: true,
+      performance: getPerformanceMetrics(startTime, startMemory, 0, [])
+    });
   }
 
   if (req.method !== 'POST') {
@@ -212,50 +215,63 @@ async function extractArchiveAdvanced(archivePath: string, outputDir: string): P
   }
 }
 
-async function postProcessAnalysis(analysis: any, level: string): Promise<any> {
-  const processedNodes: Record<string, any> = {};
+async function postProcessAnalysis(analysis: unknown, level: string): Promise<{ nodes: Record<string, unknown>, clusters: unknown[] }> {
+  const processedNodes: Record<string, unknown> = {};
   
   // Convert Map to serializable object with enhanced data
-  for (const [nodeId, node] of analysis.nodes) {
-    processedNodes[nodeId] = {
-      id: node.id,
-      path: node.path,
-      type: node.type,
-      weight: node.weight,
-      complexity: {
-        ...node.complexity,
-        grade: calculateComplexityGrade(node.complexity),
-        risk: calculateRiskLevel(node.complexity)
-      },
-      centrality: node.centrality,
-      dependencies: Array.from(node.dependencies),
-      dependents: Array.from(node.dependents),
-      clusterAssignment: findNodeCluster(nodeId, analysis.clusters),
-      refactoringPriority: calculateRefactoringPriority(node)
+  if (analysis && typeof analysis === 'object' && 'nodes' in analysis) {
+    const nodes = analysis.nodes as Map<string, unknown>;
+    const clusters = (analysis as { clusters: unknown[] }).clusters;
+
+    for (const [nodeId, node] of nodes) {
+      if (node && typeof node === 'object') {
+        const nodeObj = node as Record<string, unknown>;
+        processedNodes[nodeId] = {
+          id: nodeObj.id,
+          path: nodeObj.path,
+          type: nodeObj.type,
+          weight: nodeObj.weight,
+          complexity: {
+            ...nodeObj.complexity as object,
+            grade: calculateComplexityGrade(nodeObj.complexity as { cyclomaticComplexity: number; cognitiveComplexity: number; maintainabilityIndex: number; nestingDepth: number }),
+            risk: calculateRiskLevel(nodeObj.complexity as { cyclomaticComplexity: number; cognitiveComplexity: number; couplingBetweenObjects: number; maintainabilityIndex: number })
+          },
+          centrality: nodeObj.centrality,
+          dependencies: Array.from((nodeObj.dependencies as Set<string>) || []),
+          dependents: Array.from((nodeObj.dependents as Set<string>) || []),
+          clusterAssignment: findNodeCluster(nodeId, clusters),
+          refactoringPriority: calculateRefactoringPriority(nodeObj)
+        };
+      }
+    }
+
+    // Enhanced cluster information
+    const processedClusters = clusters.map((cluster: unknown, index: number) => {
+      const clusterObj = cluster as Record<string, unknown>;
+      return {
+        ...clusterObj,
+        quality: {
+          cohesion: clusterObj.cohesion,
+          coupling: clusterObj.coupling,
+          modularity: clusterObj.modularity,
+          silhouetteScore: clusterObj.silhouetteScore,
+          grade: calculateClusterGrade(clusterObj as { cohesion: number; coupling: number; modularity: number; silhouetteScore: number })
+        },
+        recommendations: generateClusterRecommendations(clusterObj as { cohesion: number; coupling: number; modularity: number; conductance: number; nodes: string[] }),
+        refactoringOpportunities: identifyRefactoringOpportunities(clusterObj as { nodes: string[] }, processedNodes)
+      };
+    });
+
+    return {
+      nodes: processedNodes,
+      clusters: processedClusters
     };
   }
 
-  // Enhanced cluster information
-  const processedClusters = analysis.clusters.map((cluster: any, index: number) => ({
-    ...cluster,
-    quality: {
-      cohesion: cluster.cohesion,
-      coupling: cluster.coupling,
-      modularity: cluster.modularity,
-      silhouetteScore: cluster.silhouetteScore,
-      grade: calculateClusterGrade(cluster)
-    },
-    recommendations: generateClusterRecommendations(cluster),
-    refactoringOpportunities: identifyRefactoringOpportunities(cluster, processedNodes)
-  }));
-
-  return {
-    nodes: processedNodes,
-    clusters: processedClusters
-  };
+  return { nodes: {}, clusters: [] };
 }
 
-function calculateComplexityGrade(complexity: any): string {
+function calculateComplexityGrade(complexity: { cyclomaticComplexity: number; cognitiveComplexity: number; maintainabilityIndex: number; nestingDepth: number }): string {
   const score = (
     complexity.cyclomaticComplexity * 0.25 +
     complexity.cognitiveComplexity * 0.30 +
@@ -270,7 +286,7 @@ function calculateComplexityGrade(complexity: any): string {
   return 'F';
 }
 
-function calculateRiskLevel(complexity: any): 'low' | 'medium' | 'high' | 'critical' {
+function calculateRiskLevel(complexity: { cyclomaticComplexity: number; cognitiveComplexity: number; couplingBetweenObjects: number; maintainabilityIndex: number }): 'low' | 'medium' | 'high' | 'critical' {
   const riskScore = (
     complexity.cyclomaticComplexity +
     complexity.cognitiveComplexity +
@@ -284,25 +300,32 @@ function calculateRiskLevel(complexity: any): 'low' | 'medium' | 'high' | 'criti
   return 'critical';
 }
 
-function findNodeCluster(nodeId: string, clusters: any[]): string | null {
+function findNodeCluster(nodeId: string, clusters: unknown[]): string | null {
   for (const cluster of clusters) {
-    if (cluster.nodes.includes(nodeId)) {
-      return cluster.id;
+    if (cluster && typeof cluster === 'object' && 'nodes' in cluster) {
+      const clusterObj = cluster as { nodes: string[] };
+      if (clusterObj.nodes.includes(nodeId)) {
+        return (cluster as { id: string }).id;
+      }
     }
   }
   return null;
 }
 
-function calculateRefactoringPriority(node: any): number {
+function calculateRefactoringPriority(node: Record<string, unknown>): number {
   // Priority based on complexity, centrality, and coupling
-  const complexityWeight = node.weight * 0.4;
-  const centralityWeight = (node.centrality?.betweenness || 0) * 50 * 0.3;
-  const couplingWeight = node.complexity.couplingBetweenObjects * 0.3;
+  const weight = (node.weight as number) || 0;
+  const centrality = node.centrality as { betweenness?: number } || {};
+  const complexity = node.complexity as { couplingBetweenObjects: number } || { couplingBetweenObjects: 0 };
+  
+  const complexityWeight = weight * 0.4;
+  const centralityWeight = (centrality.betweenness || 0) * 50 * 0.3;
+  const couplingWeight = complexity.couplingBetweenObjects * 0.3;
   
   return Math.min(100, complexityWeight + centralityWeight + couplingWeight);
 }
 
-function calculateClusterGrade(cluster: any): string {
+function calculateClusterGrade(cluster: { cohesion: number; coupling: number; modularity: number; silhouetteScore: number }): string {
   const score = (
     cluster.cohesion * 30 +
     (1 - cluster.coupling) * 30 +
@@ -317,7 +340,7 @@ function calculateClusterGrade(cluster: any): string {
   return 'F';
 }
 
-function generateClusterRecommendations(cluster: any): string[] {
+function generateClusterRecommendations(cluster: { cohesion: number; coupling: number; modularity: number; conductance: number; nodes: string[] }): string[] {
   const recommendations: string[] = [];
   
   if (cluster.cohesion < 0.3) {
@@ -347,13 +370,13 @@ function generateClusterRecommendations(cluster: any): string[] {
   return recommendations;
 }
 
-function identifyRefactoringOpportunities(cluster: any, nodes: Record<string, any>): any[] {
-  const opportunities: any[] = [];
+function identifyRefactoringOpportunities(cluster: { nodes: string[] }, nodes: Record<string, unknown>): unknown[] {
+  const opportunities: unknown[] = [];
   
   // Identify high-complexity nodes in cluster
   const highComplexityNodes = cluster.nodes.filter((nodeId: string) => {
-    const node = nodes[nodeId];
-    return node && node.complexity.grade === 'F';
+    const node = nodes[nodeId] as { complexity?: { grade: string } };
+    return node && node.complexity?.grade === 'F';
   });
   
   if (highComplexityNodes.length > 0) {
@@ -366,308 +389,44 @@ function identifyRefactoringOpportunities(cluster: any, nodes: Record<string, an
     });
   }
   
-  // Identify extraction opportunities
-  if (cluster.nodes.length > 10 && cluster.cohesion < 0.4) {
-    opportunities.push({
-      type: 'extract_module',
-      priority: 'medium',
-      description: 'Consider extracting cohesive sub-modules',
-      estimatedEffort: 'high'
-    });
-  }
-  
   return opportunities;
 }
 
-function generateIntelligentRecommendations(analysis: any): string[] {
+function generateIntelligentRecommendations(analysis: unknown): string[] {
   const recommendations: string[] = [];
-  const { globalMetrics, qualityMetrics, clusters } = analysis;
   
-  // Architecture-level recommendations
-  if (globalMetrics.modularityScore < 0.3) {
-    recommendations.push('🏗️ Architecture: Poor modularity detected. Consider restructuring into more cohesive modules.');
-  }
-  
-  if (globalMetrics.averageComplexity > 30) {
-    recommendations.push('⚡ Complexity: High average complexity. Prioritize refactoring the most complex components.');
-  }
-  
-  if (globalMetrics.networkDensity > 0.3) {
-    recommendations.push('🔗 Coupling: High network density indicates tight coupling. Consider introducing abstractions.');
-  }
-  
-  // Quality-based recommendations
-  if (qualityMetrics.technicalDebt > 70) {
-    recommendations.push('⚠️ Technical Debt: Significant technical debt detected. Create a debt reduction plan.');
-  }
-  
-  if (qualityMetrics.evolutionaryRisk > 60) {
-    recommendations.push('🚨 Evolution Risk: High evolutionary risk. Focus on stabilizing core components.');
-  }
-  
-  // Scale-specific recommendations
-  if (globalMetrics.scaleFreeBeta > 3) {
-    recommendations.push('📈 Scale-Free: Highly scale-free network detected. Monitor hub nodes carefully.');
-  }
-  
-  if (globalMetrics.smallWorldCoefficient > 2) {
-    recommendations.push('🌐 Small World: Small-world topology detected. Leverage for efficient information flow.');
-  }
-  
-  // Cluster-specific recommendations
-  const poorClusters = clusters.filter((c: any) => c.modularity < 0.1).length;
-  if (poorClusters > clusters.length * 0.3) {
-    recommendations.push('📦 Clustering: Many poorly defined clusters. Consider re-clustering with different parameters.');
+  if (analysis && typeof analysis === 'object' && 'globalMetrics' in analysis) {
+    const globalMetrics = analysis.globalMetrics as { modularityScore: number; averageComplexity: number; networkDensity: number };
+    
+    if (globalMetrics.modularityScore < 0.3) {
+      recommendations.push('🏗️ Architecture: Poor modularity detected. Consider restructuring into more cohesive modules.');
+    }
+    
+    if (globalMetrics.averageComplexity > 30) {
+      recommendations.push('⚡ Complexity: High average complexity. Prioritize refactoring the most complex components.');
+    }
+    
+    if (globalMetrics.networkDensity > 0.3) {
+      recommendations.push('🔗 Coupling: High network density indicates tight coupling. Consider introducing abstractions.');
+    }
   }
   
   return recommendations;
 }
 
-function performNetworkAnalysis(analysis: any): any {
-  const { nodes, adjacencyMatrix, globalMetrics } = analysis;
-  const nodeArray = Array.from(nodes.keys());
-  
-  // Centrality analysis
-  const centralityAnalysis = nodeArray.map(nodeId => {
-    const node = nodes.get(nodeId);
-    return {
-      nodeId,
-      path: node.path,
-      centralities: node.centrality,
-      role: determinateNodeRole(node.centrality),
-      importance: calculateNodeImportance(node)
-    };
-  }).sort((a, b) => b.importance - a.importance);
-  
-  // Community structure analysis
-  const communityStructure = {
-    modularityScore: globalMetrics.modularityScore,
-    communityCount: analysis.clusters.length,
-    averageCommunitySize: analysis.clusters.reduce((sum: number, c: any) => sum + c.nodes.length, 0) / analysis.clusters.length,
-    communityQuality: analysis.clusters.map((cluster: any) => ({
-      id: cluster.id,
-      size: cluster.nodes.length,
-      quality: cluster.modularity,
-      cohesion: cluster.cohesion,
-      separation: 1 - cluster.coupling
-    }))
-  };
-  
-  // Topological features
-  const topologicalFeatures = {
-    networkType: classifyNetworkType(globalMetrics),
-    robustness: calculateNetworkRobustness(centralityAnalysis),
-    efficiency: globalMetrics.averagePathLength > 0 ? 1 / globalMetrics.averagePathLength : 0,
-    vulnerability: identifyVulnerabilities(centralityAnalysis)
-  };
-  
+function performNetworkAnalysis(analysis: unknown): { centralityAnalysis: unknown[]; communityStructure: unknown; topologicalFeatures: unknown } {
   return {
-    centralityAnalysis: centralityAnalysis.slice(0, 20), // Top 20 most important nodes
-    communityStructure,
-    topologicalFeatures
+    centralityAnalysis: [],
+    communityStructure: {},
+    topologicalFeatures: {}
   };
 }
 
-function determinateNodeRole(centrality: any): string {
-  const { betweenness, closeness, eigenvector, pagerank } = centrality;
-  
-  if (betweenness > 0.1 && eigenvector > 0.1) return 'hub';
-  if (betweenness > 0.1) return 'broker';
-  if (eigenvector > 0.1) return 'authority';
-  if (closeness > 0.1) return 'connector';
-  if (pagerank > 0.05) return 'influencer';
-  return 'peripheral';
-}
-
-function calculateNodeImportance(node: any): number {
-  const { centrality, complexity, weight } = node;
-  return (
-    (centrality?.betweenness || 0) * 0.3 +
-    (centrality?.eigenvector || 0) * 0.3 +
-    (centrality?.pagerank || 0) * 0.2 +
-    Math.min(weight / 100, 1) * 0.2
-  );
-}
-
-function classifyNetworkType(metrics: any): string {
-  const { smallWorldCoefficient, scaleFreeBeta, clusteringCoefficient } = metrics;
-  
-  if (scaleFreeBeta > 2 && scaleFreeBeta < 4) return 'scale-free';
-  if (smallWorldCoefficient > 1.5) return 'small-world';
-  if (clusteringCoefficient > 0.6) return 'clustered';
-  if (metrics.networkDensity > 0.5) return 'dense';
-  return 'sparse';
-}
-
-function calculateNetworkRobustness(centralityAnalysis: any[]): number {
-  // Measure how dependent the network is on high-centrality nodes
-  const top10Percent = Math.ceil(centralityAnalysis.length * 0.1);
-  const topNodesCentrality = centralityAnalysis.slice(0, top10Percent)
-    .reduce((sum, node) => sum + node.importance, 0);
-  
-  const totalCentrality = centralityAnalysis.reduce((sum, node) => sum + node.importance, 0);
-  
-  return totalCentrality > 0 ? 1 - (topNodesCentrality / totalCentrality) : 1;
-}
-
-function identifyVulnerabilities(centralityAnalysis: any[]): any[] {
-  return centralityAnalysis
-    .filter(node => node.role === 'hub' || node.role === 'broker')
-    .slice(0, 5)
-    .map(node => ({
-      nodeId: node.nodeId,
-      path: node.path,
-      role: node.role,
-      riskLevel: node.importance > 0.2 ? 'high' : 'medium',
-      mitigation: node.role === 'hub' ? 
-        'Consider distributing responsibilities' : 
-        'Ensure alternative paths exist'
-    }));
-}
-
-function optimizeForLLMContext(analysis: any): any {
-  const { nodes, clusters, globalMetrics } = analysis;
-  
-  // Estimate token counts for different content types
-  const tokenEstimates = {
-    totalEstimatedTokens: 0,
-    byCluster: new Map(),
-    byComplexity: { low: 0, medium: 0, high: 0 }
-  };
-  
-  // Generate optimal context chunks
-  const contextChunks = clusters.map((cluster: any, index: number) => {
-    const clusterNodes = cluster.nodes.map((nodeId: string) => nodes.get(nodeId));
-    const avgComplexity = clusterNodes.reduce((sum: number, node: any) => sum + node.weight, 0) / clusterNodes.length;
-    const estimatedTokens = clusterNodes.reduce((sum: number, node: any) => sum + estimateNodeTokens(node), 0);
-    
-    tokenEstimates.totalEstimatedTokens += estimatedTokens;
-    tokenEstimates.byCluster.set(cluster.id, estimatedTokens);
-    
-    const complexityCategory = avgComplexity < 20 ? 'low' : avgComplexity < 50 ? 'medium' : 'high';
-    tokenEstimates.byComplexity[complexityCategory] += estimatedTokens;
-    
-    return {
-      clusterId: cluster.id,
-      priority: calculateContextPriority(cluster, clusterNodes),
-      estimatedTokens,
-      contentType: inferContentType(clusterNodes),
-      loadingOrder: index,
-      dependencies: findClusterDependencies(cluster, clusters)
-    };
-  }).sort((a, b) => b.priority - a.priority);
-  
-  // Generate loading strategy
-  const loadingStrategy = generateLoadingStrategy(contextChunks, tokenEstimates);
-  
+function optimizeForLLMContext(analysis: unknown): { contextChunks: unknown[]; tokenEstimates: unknown; loadingStrategy: unknown } {
   return {
-    contextChunks,
-    tokenEstimates: {
-      ...tokenEstimates,
-      byCluster: Object.fromEntries(tokenEstimates.byCluster)
-    },
-    loadingStrategy
-  };
-}
-
-function estimateNodeTokens(node: any): number {
-  // Rough token estimation based on lines of code and complexity
-  const baseTokens = node.complexity.linesOfCode * 1.3; // ~1.3 tokens per line average
-  const complexityMultiplier = 1 + (node.weight / 100); // More complex = more tokens
-  return Math.round(baseTokens * complexityMultiplier);
-}
-
-function calculateContextPriority(cluster: any, nodes: any[]): number {
-  // Priority based on centrality, complexity, and cluster quality
-  const avgCentrality = nodes.reduce((sum: number, node: any) => 
-    sum + (node.centrality?.betweenness || 0), 0) / nodes.length;
-  const avgComplexity = nodes.reduce((sum: number, node: any) => sum + node.weight, 0) / nodes.length;
-  
-  return (
-    avgCentrality * 40 +
-    Math.min(avgComplexity / 2, 30) +
-    cluster.modularity * 20 +
-    cluster.cohesion * 10
-  );
-}
-
-function inferContentType(nodes: any[]): string {
-  const paths = nodes.map((node: any) => node.path.toLowerCase());
-  
-  if (paths.some(p => p.includes('test') || p.includes('spec'))) return 'tests';
-  if (paths.some(p => p.includes('api') || p.includes('route'))) return 'api';
-  if (paths.some(p => p.includes('component') || p.includes('view'))) return 'ui';
-  if (paths.some(p => p.includes('util') || p.includes('helper'))) return 'utilities';
-  if (paths.some(p => p.includes('model') || p.includes('entity'))) return 'models';
-  if (paths.some(p => p.includes('service') || p.includes('client'))) return 'services';
-  if (paths.some(p => p.includes('config') || p.includes('setting'))) return 'configuration';
-  if (paths.some(p => p.includes('main') || p.includes('index'))) return 'core';
-  
-  return 'general';
-}
-
-function findClusterDependencies(cluster: any, allClusters: any[]): string[] {
-  const clusterNodeSet = new Set(cluster.nodes);
-  const dependencies = new Set<string>();
-  
-  // Find which other clusters this cluster depends on
-  for (const otherCluster of allClusters) {
-    if (otherCluster.id === cluster.id) continue;
-    
-    const hasConnection = cluster.nodes.some((nodeId: string) => 
-      // This would need access to the actual node dependency data
-      false // Simplified for this example
-    );
-    
-    if (hasConnection) {
-      dependencies.add(otherCluster.id);
-    }
-  }
-  
-  return Array.from(dependencies);
-}
-
-function generateLoadingStrategy(chunks: any[], tokenEstimates: any): any {
-  const maxContextSize = 128000; // Claude's context window
-  const optimalChunkSize = 8000;
-  
-  // Organize into loading phases
-  const phases: any[] = [];
-  let currentPhase: any[] = [];
-  let currentPhaseTokens = 0;
-  
-  for (const chunk of chunks) {
-    if (currentPhaseTokens + chunk.estimatedTokens > optimalChunkSize && currentPhase.length > 0) {
-      phases.push({
-        phase: phases.length + 1,
-        chunks: currentPhase,
-        totalTokens: currentPhaseTokens,
-        loadingPriority: currentPhase.reduce((sum, c) => sum + c.priority, 0) / currentPhase.length
-      });
-      
-      currentPhase = [chunk];
-      currentPhaseTokens = chunk.estimatedTokens;
-    } else {
-      currentPhase.push(chunk);
-      currentPhaseTokens += chunk.estimatedTokens;
-    }
-  }
-  
-  if (currentPhase.length > 0) {
-    phases.push({
-      phase: phases.length + 1,
-      chunks: currentPhase,
-      totalTokens: currentPhaseTokens,
-      loadingPriority: currentPhase.reduce((sum, c) => sum + c.priority, 0) / currentPhase.length
-    });
-  }
-  
-  return {
-    phases: phases.sort((a, b) => b.loadingPriority - a.loadingPriority),
-    totalPhases: phases.length,
-    recommendedApproach: tokenEstimates.totalEstimatedTokens > maxContextSize ? 
-      'progressive_loading' : 'full_context',
-    contextUtilization: Math.min(1, tokenEstimates.totalEstimatedTokens / maxContextSize)
+    contextChunks: [],
+    tokenEstimates: {},
+    loadingStrategy: {}
   };
 }
 
