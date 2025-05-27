@@ -219,9 +219,9 @@ async function postProcessAnalysis(analysis: unknown, level: string): Promise<{ 
   const processedNodes: Record<string, unknown> = {};
   
   // Convert Map to serializable object with enhanced data
-  if (analysis && typeof analysis === 'object' && 'nodes' in analysis) {
+  if (analysis && typeof analysis === 'object' && 'nodes' in analysis && 'clusters' in analysis) {
     const nodes = analysis.nodes as Map<string, unknown>;
-    const clusters = (analysis as { clusters: unknown[] }).clusters;
+    const clusters = analysis.clusters as unknown[];
 
     for (const [nodeId, node] of nodes) {
       if (node && typeof node === 'object') {
