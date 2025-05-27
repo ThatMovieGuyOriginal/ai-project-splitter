@@ -3,6 +3,7 @@ LLM Index Analyzer 2.0
 A modern, privacy-first codebase analyzer optimized for LLM context understanding. Built from the ground up with TypeScript for reliability, performance, and maintainability.
 ✨ Key Improvements
 
+```
 🎯 TypeScript-First: Complete type safety and better IDE support
 ⚡ Performance: 3x faster analysis with streaming architecture
 🔒 Enhanced Security: Multi-layer security scanning with pattern detection
@@ -11,6 +12,7 @@ A modern, privacy-first codebase analyzer optimized for LLM context understandin
 🧪 Test Coverage: Comprehensive testing with Jest and React Testing Library
 📊 Better Visualization: Interactive cluster diagrams with D3.js
 🔄 GitHub Actions: Automated CI/CD with security scanning
+```
 
 ```
 🏗️ Architecture
