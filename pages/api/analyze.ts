@@ -1,11 +1,12 @@
+// pages/api/analyze.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import { CodeAnalyzer } from '../../src/core/analyzer';
 import { SecurityScanner } from '../../src/security/scanner';
 import { tmpdir } from 'os';
-import { join } from 'path';
-import { mkdtemp, rm } from 'fs/promises';
-import { createReadStream } from 'fs';
+import { join, resolve, relative } from 'path';
+import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
+import { createReadStream, createWriteStream } from 'fs';
 import { extract } from 'tar-stream';
 import { createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxFiles: 1,
     });
 
-    const [fields, files] = await form.parse(req);
+    const [, files] = await form.parse(req);
     const file = Array.isArray(files.file) ? files.file[0] : files.file;
 
     if (!file) {
@@ -71,11 +72,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 async function extractArchive(archivePath: string, outputDir: string): Promise<void> {
-  // Basic tar.gz extraction logic
   const readStream = createReadStream(archivePath);
-  const gunzip = createGunzip();
-  const extractor = extract();
   
-  // Implementation would go here...
-  // For now, just create a dummy structure
+  if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+    const gunzip = createGunzip();
+    const extractor = extract();
+    
+    extractor.on('entry', async (header, stream, next) => {
+      try {
+        if (header.type === 'file') {
+          const outputPath = resolve(join(outputDir, header.name));
+          
+          // Security: Prevent path traversal attacks
+          const relativePath = relative(outputDir, outputPath);
+          if (relativePath.startsWith('..') || resolve(outputPath) !== outputPath) {
+            stream.resume();
+            return next();
+          }
+          
+          // Create directory structure
+          await mkdir(resolve(outputPath, '..'), { recursive: true });
+          
+          const writeStream = createWriteStream(outputPath);
+          await pipeline(stream, writeStream);
+        } else {
+          stream.resume();
+        }
+        next();
+      } catch (error) {
+        console.warn(`Failed to extract ${header.name}:`, error);
+        stream.resume();
+        next();
+      }
+    });
+
+    await pipeline(readStream, gunzip, extractor);
+  } else if (archivePath.endsWith('.zip')) {
+    // For ZIP files, create a simple extraction fallback
+    // In production, you'd want to use a proper ZIP library
+    throw new Error('ZIP files not supported yet. Please use .tar.gz format.');
+  } else {
+    throw new Error('Unsupported archive format. Please use .tar.gz format.');
+  }
 }
