@@ -1,7 +1,13 @@
 import { useState } from "react";
+import Link from "next/link";
+
+interface RefactorPlan {
+  from: string;
+  to: string;
+}
 
 export default function Dashboard() {
-  const [plan, setPlan] = useState<any[]>([]);
+  const [plan, setPlan] = useState<RefactorPlan[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -94,7 +100,7 @@ export default function Dashboard() {
       )}
       <footer>
         <small>
-          <a href="/privacy">Privacy</a> | <a href="/legal">Legal</a> | Abuse: abuse@example.com
+          <Link href="/privacy">Privacy</Link> | <Link href="/legal">Legal</Link> | Abuse: abuse@example.com
         </small>
       </footer>
     </main>
