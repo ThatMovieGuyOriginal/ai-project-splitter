@@ -4,8 +4,12 @@ import formidable from 'formidable';
 import { CodeAnalyzer } from '../../src/core/analyzer';
 import { RefactorEngine } from '../../src/refactor/engine';
 import { tmpdir } from 'os';
-import { join } from 'path';
-import { mkdtemp, rm } from 'fs/promises';
+import { join, resolve, relative } from 'path';
+import { mkdtemp, rm, mkdir } from 'fs/promises';
+import { createReadStream, createWriteStream } from 'fs';
+import { extract } from 'tar-stream';
+import { createGunzip } from 'zlib';
+import { pipeline } from 'stream/promises';
 import archiver from 'archiver';
 
 export const config = {
@@ -88,5 +92,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.warn('Failed to cleanup temp directory:', e);
       }
     }
+  }
+}
+
+async function extractArchive(archivePath: string, outputDir: string): Promise<void> {
+  const readStream = createReadStream(archivePath);
+  
+  if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+    const gunzip = createGunzip();
+    const extractor = extract();
+    
+    extractor.on('entry', async (header, stream, next) => {
+      try {
+        if (header.type === 'file') {
+          const outputPath = resolve(join(outputDir, header.name));
+          
+          // Security: Prevent path traversal attacks
+          const relativePath = relative(outputDir, outputPath);
+          if (relativePath.startsWith('..') || resolve(outputPath) !== outputPath) {
+            stream.resume();
+            return next();
+          }
+          
+          // Create directory structure
+          await mkdir(resolve(outputPath, '..'), { recursive: true });
+          
+          const writeStream = createWriteStream(outputPath);
+          await pipeline(stream, writeStream);
+        } else {
+          stream.resume();
+        }
+        next();
+      } catch (error) {
+        console.warn(`Failed to extract ${header.name}:`, error);
+        stream.resume();
+        next();
+      }
+    });
+
+    await pipeline(readStream, gunzip, extractor);
+  } else {
+    throw new Error('Unsupported archive format. Please use .tar.gz format.');
   }
 }
