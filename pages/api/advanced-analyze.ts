@@ -168,12 +168,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 }
 
 async function extractArchiveAdvanced(archivePath: string, outputDir: string): Promise<void> {
-  const { createReadStream } = await import('fs');
+  const { createReadStream, createWriteStream } = await import('fs');
   const { pipeline } = await import('stream/promises');
   const { createGunzip } = await import('zlib');
   const { extract } = await import('tar-stream');
   const { join, resolve, relative } = await import('path');
-  const { createWriteStream, mkdir } = await import('fs/promises');
+  const { mkdir } = await import('fs/promises');
 
   const readStream = createReadStream(archivePath);
   
