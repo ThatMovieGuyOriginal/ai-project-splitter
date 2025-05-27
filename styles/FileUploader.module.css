@@ -1,0 +1,79 @@
+.uploader {
+  padding: 2rem 0;
+}
+
+.dropzone {
+  border: 2px dashed #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  background: #f8fafc;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.dropzone:hover:not(.disabled) {
+  border-color: #2563eb;
+  background: #f8faff;
+}
+
+.dropzone.active {
+  border-color: #2563eb;
+  background: #f0f9ff;
+  border-style: solid;
+}
+
+.dropzone.disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.content {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.content p {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #f8fafc;
+  border-top: 3px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.progress {
+  width: 100%;
+  height: 4px;
+  background: #f8fafc;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.progressBar {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.3s ease;
+}
