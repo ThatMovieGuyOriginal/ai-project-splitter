@@ -302,10 +302,10 @@ function calculateRiskLevel(complexity: { cyclomaticComplexity: number; cognitiv
 
 function findNodeCluster(nodeId: string, clusters: unknown[]): string | null {
   for (const cluster of clusters) {
-    if (cluster && typeof cluster === 'object' && 'nodes' in cluster) {
-      const clusterObj = cluster as { nodes: string[] };
+    if (cluster && typeof cluster === 'object' && 'nodes' in cluster && 'id' in cluster) {
+      const clusterObj = cluster as { nodes: string[]; id: string };
       if (clusterObj.nodes.includes(nodeId)) {
-        return (cluster as { id: string }).id;
+        return clusterObj.id;
       }
     }
   }
