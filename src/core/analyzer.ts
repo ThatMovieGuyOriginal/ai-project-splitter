@@ -2,8 +2,8 @@
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as ts from 'typescript';
-import { readFileSync } from 'fs';
-import { join, extname, basename } from 'path';
+import { readFileSync, statSync } from 'fs';
+import { extname, basename } from 'path';
 
 export interface FileAnalysis {
   path: string;
@@ -76,7 +76,7 @@ export class CodeAnalyzer {
     
     return files.filter(file => {
       try {
-        const stats = require('fs').statSync(file);
+        const stats = statSync(file);
         return stats.size <= this.maxFileSize;
       } catch {
         return false;
@@ -237,9 +237,9 @@ export class CodeAnalyzer {
 
     let match;
     while ((match = importRegex.exec(content)) !== null) {
-      const module = match[1] || match[2].split(',')[0].trim();
-      dependencies.push(module);
-      imports.push(module);
+      const moduleValue = match[1] || match[2].split(',')[0].trim();
+      dependencies.push(moduleValue);
+      imports.push(moduleValue);
     }
 
     // Count complexity keywords
