@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "pages/api/**/*.ts": {
-      "runtime": "@vercel/node",
+      "runtime": "nodejs18.x",
       "maxDuration": 30
     }
   },
@@ -28,12 +28,6 @@
           "value": "Content-Type"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
     }
   ]
 }
