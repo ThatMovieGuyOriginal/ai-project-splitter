@@ -1493,8 +1493,6 @@ export class AdvancedCodeAnalyzer {
     // Count operators
     for (const op of langOperators) {
       const regex = new RegExp(`\\${op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
-    const operatorPatterns: Record<string, string[]> = {
-      javascript: ['+', '-', '*', '/', '%',')}`, 'g');
       const matches = content.match(regex);
       if (matches) {
         operators.set(op, (operators.get(op) || 0) + matches.length);
