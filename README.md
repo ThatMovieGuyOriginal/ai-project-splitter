@@ -12,6 +12,7 @@ A modern, privacy-first codebase analyzer optimized for LLM context understandin
 📊 Better Visualization: Interactive cluster diagrams with D3.js
 🔄 GitHub Actions: Automated CI/CD with security scanning
 
+```
 🏗️ Architecture
 📁 Project Structure
 ├── 🎯 src/core/           # Core analysis engine
@@ -30,6 +31,8 @@ A modern, privacy-first codebase analyzer optimized for LLM context understandin
 │   ├── github.ts         # GitHub import endpoint
 │   └── refactor.ts       # Refactoring endpoint
 └── 🎭 styles/            # Modern CSS modules
+```
+
 🚀 Quick Start
 Prerequisites
 
