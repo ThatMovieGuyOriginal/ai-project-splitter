@@ -80,9 +80,12 @@ export class UniversalArchiveExtractor {
 
         // Security: Prevent path traversal
         const safePath = this.sanitizePath(entry.entryName);
-        const outputPath = resolve(outputDir, safePath);
+        const outputPath = join(outputDir, safePath);
         
-        if (!outputPath.startsWith(resolve(outputDir))) {
+        // Security check: ensure the resolved path is within outputDir
+        const resolvedOutputPath = resolve(outputPath);
+        const resolvedOutputDir = resolve(outputDir);
+        if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
           console.warn(`Skipping potentially dangerous path: ${entry.entryName}`);
           continue;
         }
@@ -143,9 +146,12 @@ export class UniversalArchiveExtractor {
 
         // Security: Prevent path traversal
         const safePath = this.sanitizePath(entry.name);
-        const outputPath = resolve(outputDir, safePath);
+        const outputPath = join(outputDir, safePath);
         
-        if (!outputPath.startsWith(resolve(outputDir))) {
+        // Security check: ensure the resolved path is within outputDir
+        const resolvedOutputPath = resolve(outputPath);
+        const resolvedOutputDir = resolve(outputDir);
+        if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
           throw new Error(`Path traversal attempt: ${entry.name}`);
         }
 
@@ -245,10 +251,12 @@ export class UniversalArchiveExtractor {
 
           if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
-            const outputPath = resolve(outputDir, safePath);
+            const outputPath = join(outputDir, safePath);
             
             // Security: Prevent path traversal
-            if (!outputPath.startsWith(resolve(outputDir))) {
+            const resolvedOutputPath = resolve(outputPath);
+            const resolvedOutputDir = resolve(outputDir);
+            if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
               stream.resume();
               return next();
             }
@@ -307,9 +315,12 @@ export class UniversalArchiveExtractor {
 
           if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
-            const outputPath = resolve(outputDir, safePath);
+            const outputPath = join(outputDir, safePath);
             
-            if (!outputPath.startsWith(resolve(outputDir))) {
+            // Security: Prevent path traversal
+            const resolvedOutputPath = resolve(outputPath);
+            const resolvedOutputDir = resolve(outputDir);
+            if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
               stream.resume();
               return next();
             }
