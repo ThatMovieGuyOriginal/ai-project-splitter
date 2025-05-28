@@ -1,13 +1,24 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, X, Folder, Github } from 'lucide-react';
 
-const ModernFileUploader = ({ onAnalyze, loading }) => {
+// Add proper type definition for props
+interface ModernFileUploaderProps {
+  onAnalyze: (file: File) => Promise<void>;
+  loading: boolean;
+}
+
+const ModernFileUploader: React.FC<ModernFileUploaderProps> = ({ onAnalyze, loading }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [files, setFiles] = useState([]);
-  const [error, setError] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
-  const fileInputRef = useRef(null);
+  const [files, setFiles] = useState<Array<{
+    name: string;
+    size: number;
+    type: string;
+    lastModified: number;
+  }>>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supportedFormats = [
     { ext: 'ZIP', color: 'bg-blue-100 text-blue-700', desc: 'Most common archive format' },
@@ -17,7 +28,7 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     { ext: 'GZ', color: 'bg-pink-100 text-pink-700', desc: 'Gzip compressed file' }
   ];
 
-  const validateFile = useCallback((file) => {
+  const validateFile = useCallback((file: File): string | null => {
     const maxSize = 25 * 1024 * 1024; // 25MB
     const supportedExts = ['.zip', '.tar', '.tar.gz', '.tgz', '.gz'];
     
@@ -35,7 +46,7 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     return null;
   }, []);
 
-  const handleDrag = useCallback((e) => {
+  const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') {
@@ -45,7 +56,7 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     }
   }, []);
 
-  const handleDrop = useCallback(async (e) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -67,8 +78,8 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     await processFile(file);
   }, [validateFile]);
 
-  const handleFileSelect = useCallback(async (e) => {
-    const selectedFiles = Array.from(e.target.files);
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
 
     const file = selectedFiles[0];
@@ -82,7 +93,7 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     await processFile(file);
   }, [validateFile]);
 
-  const processFile = async (file) => {
+  const processFile = async (file: File) => {
     setError(null);
     setUploadStatus('uploading');
     setFiles([{
@@ -102,7 +113,8 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
       await onAnalyze(file);
       setUploadStatus('success');
     } catch (err) {
-      setError(err.message || 'Upload failed. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed. Please try again.';
+      setError(errorMessage);
       setUploadStatus('error');
     }
   };
@@ -117,7 +129,7 @@ const ModernFileUploader = ({ onAnalyze, loading }) => {
     }
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
