@@ -1,6 +1,6 @@
 // components/FileUploader.tsx
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, FileRejection } from 'react-dropzone';
 import styles from '../styles/FileUploader.module.css';
 
 interface FileUploaderProps {
@@ -50,7 +50,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }
     return null;
   }, []);
 
-  const onDrop = useCallback(async (acceptedFiles: File[], fileRejections: Array<{ file: File; errors: Array<{ code: string; message: string }> }>) => {
+  const onDrop = useCallback(async (acceptedFiles: File[], fileRejections: FileRejection[]) => {
     // Handle rejections
     if (fileRejections.length > 0) {
       const rejection = fileRejections[0];
