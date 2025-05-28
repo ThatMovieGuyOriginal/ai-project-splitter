@@ -1,3 +1,4 @@
+/* styles/FileUploader.module.css */
 .uploader {
   padding: 2rem 0;
 }
@@ -10,6 +11,7 @@
   background: #f8fafc;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  position: relative;
 }
 
 .dropzone:hover:not(.disabled) {
@@ -21,6 +23,13 @@
   border-color: #2563eb;
   background: #f0f9ff;
   border-style: solid;
+  transform: scale(1.02);
+}
+
+.dropzone.reject {
+  border-color: #ef4444 !important;
+  background: #fef2f2 !important;
+  border-style: solid;
 }
 
 .dropzone.disabled {
@@ -29,23 +38,71 @@
 }
 
 .content {
-  max-width: 400px;
+  max-width: 500px;
   margin: 0 auto;
 }
 
 .icon {
   font-size: 3rem;
   margin-bottom: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.dropzone.active .icon {
+  transform: scale(1.1);
 }
 
 .content p {
   font-size: 1.1rem;
   margin-bottom: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.errorText {
+  color: #ef4444 !important;
+  font-weight: 600;
 }
 
 .hint {
   font-size: 0.9rem;
   color: #64748b;
+  margin: 0.5rem 0;
+}
+
+.supportedFormats {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.supportedFormats .hint:first-child {
+  color: #475569;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.formatsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.75rem 0;
+}
+
+.formatBadge {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #3730a3;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #c7d2fe;
+  transition: all 0.2s ease;
+}
+
+.formatBadge:hover {
+  background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%);
+  transform: translateY(-1px);
 }
 
 .spinner {
@@ -65,15 +122,312 @@
 
 .progress {
   width: 100%;
-  height: 4px;
-  background: #f8fafc;
-  border-radius: 2px;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
   overflow: hidden;
   margin-top: 1rem;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .progressBar {
   height: 100%;
-  background: #2563eb;
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%);
   transition: width 0.3s ease;
+  border-radius: 4px;
+  position: relative;
+}
+
+.progressBar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progressText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  color: #1e293b;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.helpSection {
+  margin-top: 2rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.helpDetails {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.helpDetails:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.helpDetails[open] {
+  border-color: #2563eb;
+}
+
+.helpSummary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #475569;
+  padding: 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.helpSummary:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.helpDetails[open] .helpSummary {
+  border-bottom-color: #e2e8f0;
+}
+
+.helpSummary::marker {
+  display: none;
+}
+
+.helpSummary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+  color: #64748b;
+}
+
+.helpDetails[open] .helpSummary::before {
+  transform: rotate(90deg);
+}
+
+.helpContent {
+  padding: 1.5rem;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.helpContent h4 {
+  color: #475569;
+  margin: 1.5rem 0 0.75rem 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.helpContent h4:first-child {
+  margin-top: 0;
+}
+
+.helpContent h4::before {
+  content: '📋';
+  margin-right: 0.5rem;
+}
+
+.helpContent ul {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.helpContent li {
+  margin: 0.5rem 0;
+  position: relative;
+}
+
+.helpContent li::marker {
+  color: #94a3b8;
+}
+
+.helpContent code {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Menlo', 'Consolas', monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid #cbd5e1;
+}
+
+.helpContent strong {
+  color: #374151;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .uploader {
+    padding: 1rem 0;
+  }
+  
+  .dropzone {
+    padding: 2rem 1rem;
+  }
+  
+  .content {
+    max-width: none;
+  }
+  
+  .icon {
+    font-size: 2.5rem;
+  }
+  
+  .content p {
+    font-size: 1rem;
+  }
+  
+  .formatsList {
+    gap: 0.25rem;
+  }
+  
+  .formatBadge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+  
+  .helpSection {
+    margin-top: 1.5rem;
+  }
+  
+  .helpContent {
+    padding: 1rem;
+  }
+  
+  .helpContent ul {
+    padding-left: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dropzone {
+    padding: 1.5rem 0.75rem;
+  }
+  
+  .icon {
+    font-size: 2rem;
+  }
+  
+  .formatsList {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .formatBadge {
+    display: inline-block;
+    margin: 0.125rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dropzone {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+  }
+  
+  .dropzone:hover:not(.disabled) {
+    background: #111827;
+    border-color: #60a5fa;
+  }
+  
+  .dropzone.active {
+    background: #1e3a8a;
+    border-color: #60a5fa;
+  }
+  
+  .hint {
+    color: #9ca3af;
+  }
+  
+  .formatBadge {
+    background: #1e40af;
+    color: #e0e7ff;
+    border-color: #3b82f6;
+  }
+  
+  .helpDetails {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .helpSummary {
+    background: #1f2937;
+    color: #d1d5db;
+  }
+  
+  .helpSummary:hover {
+    background: #111827;
+    color: #f9fafb;
+  }
+  
+  .helpContent {
+    color: #9ca3af;
+  }
+  
+  .helpContent h4 {
+    color: #d1d5db;
+  }
+  
+  .helpContent code {
+    background: #374151;
+    color: #e5e7eb;
+    border-color: #4b5563;
+  }
+  
+  .progress {
+    background: #374151;
+  }
+}
+
+/* Animation for file drop feedback */
+@keyframes dropPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.dropzone.active {
+  animation: dropPulse 0.6s ease-in-out infinite;
+}
+
+/* Success state */
+.dropzone.success {
+  border-color: #10b981;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.dropzone.success .icon::after {
+  content: ' ✅';
 }
