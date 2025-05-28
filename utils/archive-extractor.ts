@@ -1,9 +1,9 @@
 // utils/archive-extractor.ts
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir } from 'fs/promises';
-import { join, resolve, relative, dirname } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
+import { join, resolve, dirname } from 'path';
 import { pipeline } from 'stream/promises';
-import { createGunzip, createInflate } from 'zlib';
+import { createGunzip } from 'zlib';
 import { extract } from 'tar-stream';
 
 interface ArchiveEntry {
@@ -88,9 +88,15 @@ export class UniversalArchiveExtractor {
 
         if (!entry.isDirectory) {
           try {
-            // Extract the file
-            zip.extractEntryTo(entry, outputDir, false, true, false, safePath);
-            files.push(outputPath);
+            // Create directory structure
+            await mkdir(dirname(outputPath), { recursive: true });
+            
+            // Extract the file data
+            const fileData = zip.readFile(entry);
+            if (fileData) {
+              await writeFile(outputPath, fileData);
+              files.push(outputPath);
+            }
           } catch (error) {
             console.warn(`Failed to extract ${entry.entryName}:`, error);
           }
@@ -145,8 +151,7 @@ export class UniversalArchiveExtractor {
 
         if (entry.type === 'file' && entry.data) {
           await mkdir(dirname(outputPath), { recursive: true });
-          const fs = await import('fs');
-          await fs.promises.writeFile(outputPath, entry.data);
+          await writeFile(outputPath, entry.data);
           files.push(outputPath);
         }
 
@@ -160,16 +165,14 @@ export class UniversalArchiveExtractor {
     return files;
   }
 
-  private parseZipEntry(buffer: Buffer, offset: number): ArchiveEntry | null {
+  private parseZipEntry(buffer: Buffer, offset: number): (ArchiveEntry & { totalSize: number }) | null {
     try {
       // ZIP local file header structure
-      const version = buffer.readUInt16LE(offset + 4);
-      const flags = buffer.readUInt16LE(offset + 6);
-      const method = buffer.readUInt16LE(offset + 8);
       const compressedSize = buffer.readUInt32LE(offset + 18);
       const uncompressedSize = buffer.readUInt32LE(offset + 22);
       const nameLength = buffer.readUInt16LE(offset + 26);
       const extraLength = buffer.readUInt16LE(offset + 28);
+      const method = buffer.readUInt16LE(offset + 8);
       
       const nameStart = offset + 30;
       const name = buffer.toString('utf8', nameStart, nameStart + nameLength);
@@ -187,7 +190,8 @@ export class UniversalArchiveExtractor {
         // Deflate compression
         try {
           const compressed = buffer.subarray(dataStart, dataEnd);
-          data = require('zlib').inflateRawSync(compressed);
+          const zlib = await import('zlib');
+          data = zlib.inflateRawSync(compressed);
         } catch (e) {
           console.warn(`Failed to decompress ${name}:`, e);
           return null;
@@ -203,7 +207,7 @@ export class UniversalArchiveExtractor {
         size: uncompressedSize,
         data,
         totalSize: 30 + nameLength + extraLength + compressedSize
-      } as ArchiveEntry & { totalSize: number };
+      };
     } catch (e) {
       console.warn(`Failed to parse ZIP entry at offset ${offset}:`, e);
       return null;
@@ -224,20 +228,24 @@ export class UniversalArchiveExtractor {
         try {
           // Security checks
           if (++fileCount > this.maxFiles) {
+            stream.destroy();
             return reject(new Error(`Too many files in archive (max ${this.maxFiles})`));
           }
 
-          if (header.size && header.size > this.maxFileSize) {
-            return reject(new Error(`File too large: ${header.name} (${header.size} bytes)`));
+          const headerSize = header.size || 0;
+          if (headerSize > this.maxFileSize) {
+            stream.destroy();
+            return reject(new Error(`File too large: ${header.name || 'unknown'} (${headerSize} bytes)`));
           }
 
-          totalSize += header.size || 0;
+          totalSize += headerSize;
           if (totalSize > this.maxTotalSize) {
+            stream.destroy();
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
 
           if (header.type === 'file' && header.name) {
-            const safePath = this.sanitizePath(header.name!);
+            const safePath = this.sanitizePath(header.name);
             const outputPath = resolve(join(outputDir, safePath));
             
             // Security: Prevent path traversal
@@ -257,7 +265,7 @@ export class UniversalArchiveExtractor {
           
           next();
         } catch (error) {
-          console.warn(`Failed to extract ${header.name}:`, error);
+          console.warn(`Failed to extract ${header.name || 'unknown'}:`, error);
           stream.resume();
           next();
         }
@@ -271,7 +279,6 @@ export class UniversalArchiveExtractor {
   }
 
   private async extractTar(archivePath: string, outputDir: string): Promise<string[]> {
-    // Similar to extractTarGz but without gunzip
     const files: string[] = [];
     const readStream = createReadStream(archivePath);
     const extractor = extract();
@@ -283,20 +290,24 @@ export class UniversalArchiveExtractor {
       extractor.on('entry', async (header, stream, next) => {
         try {
           if (++fileCount > this.maxFiles) {
+            stream.destroy();
             return reject(new Error(`Too many files in archive (max ${this.maxFiles})`));
           }
 
-          if (header.size && header.size > this.maxFileSize) {
-            return reject(new Error(`File too large: ${header.name} (${header.size} bytes)`));
+          const headerSize = header.size || 0;
+          if (headerSize > this.maxFileSize) {
+            stream.destroy();
+            return reject(new Error(`File too large: ${header.name || 'unknown'} (${headerSize} bytes)`));
           }
 
-          totalSize += header.size || 0;
+          totalSize += headerSize;
           if (totalSize > this.maxTotalSize) {
+            stream.destroy();
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
 
           if (header.type === 'file' && header.name) {
-            const safePath = this.sanitizePath(header.name!);
+            const safePath = this.sanitizePath(header.name);
             const outputPath = resolve(join(outputDir, safePath));
             
             if (!outputPath.startsWith(resolve(outputDir))) {
@@ -315,7 +326,7 @@ export class UniversalArchiveExtractor {
           
           next();
         } catch (error) {
-          console.warn(`Failed to extract ${header.name}:`, error);
+          console.warn(`Failed to extract ${header.name || 'unknown'}:`, error);
           stream.resume();
           next();
         }
