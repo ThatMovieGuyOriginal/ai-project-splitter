@@ -19,8 +19,8 @@ export class UniversalArchiveExtractor {
   private readonly maxTotalSize = 100 * 1024 * 1024; // 100MB total
   private readonly maxFiles = 1000;
 
-  async extractArchive(archivePath: string, outputDir: string): Promise<string[]> {
-    const archiveType = this.detectArchiveType(archivePath);
+  async extractArchive(archivePath: string, outputDir: string, originalFilename?: string): Promise<string[]> {
+    const archiveType = this.detectArchiveType(originalFilename || archivePath);
     
     switch (archiveType) {
       case 'zip':
@@ -35,7 +35,7 @@ export class UniversalArchiveExtractor {
       case 'rar':
         return this.extractRar(archivePath, outputDir);
       default:
-        throw new Error(`Unsupported archive format: ${archiveType}`);
+        throw new Error(`Unsupported archive format: ${archiveType}. Supported formats: ZIP, TAR, TAR.GZ, TGZ, GZ`);
     }
   }
 
@@ -47,9 +47,15 @@ export class UniversalArchiveExtractor {
     if (lower.endsWith('.tar')) return 'tar';
     if (lower.endsWith('.7z')) return '7z';
     if (lower.endsWith('.rar')) return 'rar';
-    if (lower.endsWith('.gz')) return 'tar.gz'; // Assume tar.gz for .gz files
+    if (lower.endsWith('.gz')) {
+      // Check if it's likely a tar.gz file
+      if (lower.includes('tar') || lower.endsWith('.tar.gz')) {
+        return 'tar.gz';
+      }
+      return 'tar.gz'; // Assume tar.gz for standalone .gz files
+    }
     
-    throw new Error(`Cannot detect archive type from filename: ${filePath}`);
+    throw new Error(`Cannot detect archive type from filename: ${filePath}. Please ensure your file has the correct extension (e.g., .zip, .tar.gz, .tgz)`);
   }
 
   private async extractZip(archivePath: string, outputDir: string): Promise<string[]> {
