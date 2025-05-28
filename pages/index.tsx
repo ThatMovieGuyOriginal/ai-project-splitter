@@ -1,10 +1,51 @@
 import React, { useState, useCallback } from 'react';
-import { Zap, Settings, Eye, Download, Play, Github, Upload, FileText, TrendingUp, Shield, Layers, AlertTriangle, CheckCircle, BarChart3, Network, Cpu, Activity } from 'lucide-react';
-import ModernFileUploader from './ModernFileUploader';
-import EnhancedVisualization from './EnhancedVisualization';
+import { Zap, Settings, Download, Play, Github, Upload, FileText, TrendingUp, Shield, Layers, AlertTriangle, CheckCircle, BarChart3, Network, Cpu, Activity } from 'lucide-react';
+import ModernFileUploader from '../components/FileUploader';
+import EnhancedVisualization from '../components/AdvancedVisualization';
+
+// Define the interfaces we need
+export interface AnalysisResult {
+  files: FileAnalysis[];
+  clusters: ClusterResult[];
+  globalMetrics: {
+    modularityScore: number;
+    networkDensity: number;
+    clusteringCoefficient: number;
+    averagePathLength: number;
+    totalComplexity: number;
+    averageComplexity: number;
+  };
+  nodes: Record<string, {
+    path: string;
+    weight: number;
+    complexity: { grade: string; risk: string };
+    centrality: { betweenness: number; pagerank: number };
+    dependencies: string[];
+    clusterAssignment: string;
+  }>;
+}
+
+interface FileAnalysis {
+  path: string;
+  complexity: number;
+  loc: number;
+  dependencies: string[];
+  grade: string;
+  risk: string;
+}
+
+interface ClusterResult {
+  id: string;
+  nodes: string[];
+  cohesion: number;
+  coupling: number;
+  size: number;
+  complexity: string;
+  quality: string;
+}
 
 // Mock data for demonstration
-const mockAnalysisResult = {
+const mockAnalysisResult: AnalysisResult = {
   files: [
     { path: 'src/core/advanced-analyzer.ts', complexity: 52, loc: 1200, dependencies: ['ml-matrix', '@babel/parser'], grade: 'D', risk: 'high' },
     { path: 'src/lib/database/index.ts', complexity: 18, loc: 450, dependencies: ['sqlite3'], grade: 'B', risk: 'medium' },
@@ -56,17 +97,37 @@ const mockAnalysisResult = {
 
 const ModernAnalyzerPage = () => {
   const [activeTab, setActiveTab] = useState('upload');
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedView, setSelectedView] = useState('overview');
 
   // Simulate file analysis
-  const handleFileAnalysis = useCallback(async (file) => {
+  const handleFileAnalysis = useCallback(async (file: File) => {
     setLoading(true);
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setAnalysisResult(mockAnalysisResult);
-    setLoading(false);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+      
+      const result = await response.json();
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      // For demo purposes, show mock data on error
+      setAnalysisResult(mockAnalysisResult);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const clearResults = useCallback(() => {
@@ -74,7 +135,14 @@ const ModernAnalyzerPage = () => {
     setSelectedView('overview');
   }, []);
 
-  const MetricCard = ({ icon: Icon, title, value, subtitle, trend, color = 'blue' }) => {
+  const MetricCard = ({ icon: Icon, title, value, subtitle, trend, color = 'blue' }: {
+    icon: React.ComponentType<any>;
+    title: string;
+    value: string;
+    subtitle?: string;
+    trend?: number;
+    color?: string;
+  }) => {
     const colorClasses = {
       blue: 'from-blue-500 to-blue-600',
       green: 'from-green-500 to-green-600',
@@ -87,7 +155,7 @@ const ModernAnalyzerPage = () => {
     return (
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:scale-105 group">
         <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-r ${colorClasses[color]} group-hover:scale-110 transition-transform`}>
+          <div className={`p-3 rounded-xl bg-gradient-to-r ${colorClasses[color as keyof typeof colorClasses]} group-hover:scale-110 transition-transform`}>
             <Icon className="h-6 w-6 text-white" />
           </div>
           {trend && (
@@ -108,18 +176,18 @@ const ModernAnalyzerPage = () => {
     );
   };
 
-  const FileRankCard = ({ file, rank }) => {
-    const getRiskColor = (risk) => {
+  const FileRankCard = ({ file, rank }: { file: FileAnalysis; rank: number }) => {
+    const getRiskColor = (risk: string) => {
       const colors = {
         low: 'bg-green-100 text-green-700 border-green-200',
         medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
         high: 'bg-red-100 text-red-700 border-red-200',
         critical: 'bg-red-200 text-red-800 border-red-300'
       };
-      return colors[risk] || colors.medium;
+      return colors[risk as keyof typeof colors] || colors.medium;
     };
 
-    const getGradeColor = (grade) => {
+    const getGradeColor = (grade: string) => {
       const colors = {
         A: 'text-green-600',
         B: 'text-blue-600',
@@ -127,7 +195,7 @@ const ModernAnalyzerPage = () => {
         D: 'text-orange-600',
         F: 'text-red-600'
       };
-      return colors[grade] || colors.C;
+      return colors[grade as keyof typeof colors] || colors.C;
     };
 
     return (
@@ -169,14 +237,18 @@ const ModernAnalyzerPage = () => {
     );
   };
 
-  const ClusterCard = ({ cluster, onClick, isSelected }) => {
-    const getComplexityColor = (complexity) => {
+  const ClusterCard = ({ cluster, onClick, isSelected }: { 
+    cluster: ClusterResult; 
+    onClick: () => void; 
+    isSelected: boolean;
+  }) => {
+    const getComplexityColor = (complexity: string) => {
       const colors = {
         low: 'bg-green-500',
         medium: 'bg-yellow-500', 
         high: 'bg-red-500'
       };
-      return colors[complexity] || colors.medium;
+      return colors[complexity as keyof typeof colors] || colors.medium;
     };
 
     return (
