@@ -237,7 +237,7 @@ export class UniversalArchiveExtractor {
           }
 
           if (header.type === 'file' && header.name) {
-            const safePath = this.sanitizePath(header.name);
+            const safePath = this.sanitizePath(header.name!);
             const outputPath = resolve(join(outputDir, safePath));
             
             // Security: Prevent path traversal
@@ -296,7 +296,7 @@ export class UniversalArchiveExtractor {
           }
 
           if (header.type === 'file' && header.name) {
-            const safePath = this.sanitizePath(header.name);
+            const safePath = this.sanitizePath(header.name!);
             const outputPath = resolve(join(outputDir, safePath));
             
             if (!outputPath.startsWith(resolve(outputDir))) {
