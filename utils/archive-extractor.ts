@@ -190,7 +190,7 @@ export class UniversalArchiveExtractor {
         // Deflate compression
         try {
           const compressed = buffer.subarray(dataStart, dataEnd);
-          const zlib = await import('zlib');
+          const zlib = require('zlib');
           data = zlib.inflateRawSync(compressed);
         } catch (e) {
           console.warn(`Failed to decompress ${name}:`, e);
