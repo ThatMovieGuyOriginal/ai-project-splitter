@@ -4,12 +4,12 @@
     "next/typescript"
   ],
   "rules": {
-    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
     "react-hooks/exhaustive-deps": "warn",
     "prefer-const": "warn",
     "no-var": "error",
-    "@next/next/no-html-link-for-pages": "warn",
+    "@next/next/no-html-link-for-pages": "error",
     "@typescript-eslint/no-require-imports": "warn"
   }
 }
