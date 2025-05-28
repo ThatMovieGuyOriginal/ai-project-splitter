@@ -236,7 +236,7 @@ export class UniversalArchiveExtractor {
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
 
-          if (header.type === 'file') {
+          if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
             const outputPath = resolve(join(outputDir, safePath));
             
@@ -295,7 +295,7 @@ export class UniversalArchiveExtractor {
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
 
-          if (header.type === 'file') {
+          if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
             const outputPath = resolve(join(outputDir, safePath));
             
