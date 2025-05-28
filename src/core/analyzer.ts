@@ -1,8 +1,8 @@
-// src/core/analyzer.ts - Remove deprecated TypeScript compiler API usage
+// src/core/analyzer.ts
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import { readFileSync, statSync } from 'fs';
-import { extname, basename } from 'path';
+import { extname, basename, dirname } from 'path';
 
 export interface FileAnalysis {
   path: string;
@@ -11,6 +11,7 @@ export interface FileAnalysis {
   loc: number;
   exports: string[];
   imports: string[];
+  type?: 'component' | 'utility' | 'service' | 'config' | 'test' | 'api' | 'page' | 'hook' | 'type' | 'style' | 'generic';
 }
 
 export interface ClusterResult {
@@ -19,6 +20,8 @@ export interface ClusterResult {
   avgComplexity: number;
   totalLoc: number;
   connections: number;
+  purpose?: string;
+  dominantType?: string;
 }
 
 export interface AnalysisResult {
@@ -50,6 +53,11 @@ export class CodeAnalyzer {
       files.map(file => this.analyzeFile(file))
     );
 
+    // Enhance analyses with file type classification
+    analyses.forEach(analysis => {
+      analysis.type = this.classifyFileType(analysis);
+    });
+
     const depGraph = this.buildDependencyGraph(analyses);
     const clusters = this.clusterFiles(analyses, depGraph);
 
@@ -64,6 +72,73 @@ export class CodeAnalyzer {
         processingTimeMs: Date.now() - startTime
       }
     };
+  }
+
+  private classifyFileType(analysis: FileAnalysis): FileAnalysis['type'] {
+    const path = analysis.path.toLowerCase();
+    const filename = basename(path);
+    const dir = dirname(path);
+
+    // Test files
+    if (path.includes('test') || path.includes('spec') || path.includes('__test__') || 
+        filename.includes('.test.') || filename.includes('.spec.')) {
+      return 'test';
+    }
+
+    // API/Route files
+    if (path.includes('/api/') || path.includes('/routes/') || path.includes('/endpoints/') ||
+        filename.includes('route') || filename.includes('endpoint') || filename.includes('controller')) {
+      return 'api';
+    }
+
+    // React components
+    if ((path.endsWith('.tsx') || path.endsWith('.jsx')) && 
+        (path.includes('/component') || filename[0] === filename[0].toUpperCase())) {
+      return 'component';
+    }
+
+    // Pages/Views
+    if (path.includes('/page') || path.includes('/view') || path.includes('/screen') ||
+        dir.includes('pages') || dir.includes('views') || dir.includes('screens')) {
+      return 'page';
+    }
+
+    // Hooks
+    if (filename.startsWith('use') && (path.endsWith('.ts') || path.endsWith('.tsx') || path.endsWith('.js'))) {
+      return 'hook';
+    }
+
+    // Utilities/Helpers
+    if (path.includes('/util') || path.includes('/helper') || path.includes('/lib') ||
+        filename.includes('util') || filename.includes('helper') || filename.includes('common')) {
+      return 'utility';
+    }
+
+    // Services
+    if (path.includes('/service') || path.includes('/client') || path.includes('/adapter') ||
+        filename.includes('service') || filename.includes('client') || filename.includes('api')) {
+      return 'service';
+    }
+
+    // Configuration
+    if (path.includes('/config') || filename.includes('config') || filename.includes('setting') ||
+        path.includes('.env') || filename.includes('constant')) {
+      return 'config';
+    }
+
+    // Type definitions
+    if (path.endsWith('.d.ts') || filename.includes('type') || filename.includes('interface') ||
+        path.includes('/types/') || dir.endsWith('types')) {
+      return 'type';
+    }
+
+    // Styles
+    if (path.endsWith('.css') || path.endsWith('.scss') || path.endsWith('.less') ||
+        path.includes('/style') || filename.includes('style') || filename.includes('theme')) {
+      return 'style';
+    }
+
+    return 'generic';
   }
 
   private async discoverFiles(rootPath: string): Promise<string[]> {
@@ -239,7 +314,6 @@ export class CodeAnalyzer {
     };
   }
 
-  // Rest of the methods remain the same...
   private buildDependencyGraph(analyses: FileAnalysis[]): Record<string, string[]> {
     const graph: Record<string, string[]> = {};
     const fileMap = new Map<string, string>();
@@ -290,62 +364,269 @@ export class CodeAnalyzer {
   private clusterFiles(analyses: FileAnalysis[], depGraph: Record<string, string[]>): ClusterResult[] {
     const clusters: ClusterResult[] = [];
     const visited = new Set<string>();
-    const maxClusterSize = 8;
+    const maxClusterSize = 12;
 
+    // First, group by file type
+    const typeGroups = new Map<string, FileAnalysis[]>();
     analyses.forEach(analysis => {
-      if (visited.has(analysis.path)) return;
+      const type = analysis.type || 'generic';
+      if (!typeGroups.has(type)) {
+        typeGroups.set(type, []);
+      }
+      typeGroups.get(type)!.push(analysis);
+    });
 
-      const cluster = this.growCluster(analysis.path, depGraph, visited, maxClusterSize);
-      if (cluster.length > 0) {
-        const clusterAnalyses = cluster.map(path => analyses.find(a => a.path === path)!);
-        const avgComplexity = clusterAnalyses.reduce((sum, a) => sum + a.complexity, 0) / cluster.length;
-        const totalLoc = clusterAnalyses.reduce((sum, a) => sum + a.loc, 0);
-        const connections = this.countClusterConnections(cluster, depGraph);
+    // Create clusters based on type and relationships
+    for (const [type, files] of typeGroups) {
+      if (files.length === 0) continue;
 
-        clusters.push({
-          id: `cluster_${clusters.length}`,
-          files: cluster,
-          avgComplexity,
-          totalLoc,
-          connections
+      // For small groups, create a single cluster
+      if (files.length <= maxClusterSize) {
+        const cluster = this.createCluster(files, type, depGraph);
+        if (cluster) {
+          clusters.push(cluster);
+          files.forEach(f => visited.add(f.path));
+        }
+      } else {
+        // For larger groups, split by relationships
+        const subClusters = this.splitByRelationships(files, depGraph, maxClusterSize);
+        subClusters.forEach((subFiles, index) => {
+          const cluster = this.createCluster(subFiles, type, depGraph, index);
+          if (cluster) {
+            clusters.push(cluster);
+            subFiles.forEach(f => visited.add(f.path));
+          }
         });
       }
-    });
+    }
+
+    // Handle remaining unvisited files
+    const remaining = analyses.filter(a => !visited.has(a.path));
+    if (remaining.length > 0) {
+      const miscClusters = this.groupRemainingFiles(remaining, depGraph, maxClusterSize);
+      clusters.push(...miscClusters);
+    }
 
     return clusters;
   }
 
-  private growCluster(startFile: string, depGraph: Record<string, string[]>, visited: Set<string>, maxSize: number): string[] {
-    const cluster: string[] = [];
-    const queue: string[] = [startFile];
+  private createCluster(files: FileAnalysis[], type: string, depGraph: Record<string, string[]>, index?: number): ClusterResult | null {
+    if (files.length === 0) return null;
+
+    const clusterName = this.generateClusterName(type, files, index);
+    const filePaths = files.map(f => f.path);
+    const avgComplexity = files.reduce((sum, f) => sum + f.complexity, 0) / files.length;
+    const totalLoc = files.reduce((sum, f) => sum + f.loc, 0);
+    const connections = this.countClusterConnections(filePaths, depGraph);
+    const purpose = this.inferClusterPurpose(files, type);
+
+    return {
+      id: clusterName,
+      files: filePaths,
+      avgComplexity,
+      totalLoc,
+      connections,
+      purpose,
+      dominantType: type
+    };
+  }
+
+  private generateClusterName(type: string, files: FileAnalysis[], index?: number): string {
+    const typeNames: Record<string, string> = {
+      'component': 'UI Components',
+      'page': 'Pages & Views',
+      'api': 'API Layer',
+      'service': 'Services',
+      'utility': 'Utilities',
+      'hook': 'React Hooks',
+      'test': 'Test Suite',
+      'config': 'Configuration',
+      'type': 'Type Definitions',
+      'style': 'Styling',
+      'generic': 'Core Modules'
+    };
+
+    let baseName = typeNames[type] || 'Modules';
+
+    // Add complexity indicator
+    const avgComplexity = files.reduce((sum, f) => sum + f.complexity, 0) / files.length;
+    if (avgComplexity > 25) {
+      baseName = `Complex ${baseName}`;
+    } else if (avgComplexity < 5) {
+      baseName = `Simple ${baseName}`;
+    }
+
+    // Add index if there are multiple clusters of the same type
+    if (index !== undefined && index > 0) {
+      baseName += ` ${index + 1}`;
+    }
+
+    // Add specific context based on file patterns
+    const context = this.getClusterContext(files);
+    if (context) {
+      baseName = `${context} ${baseName.replace('Complex ', '').replace('Simple ', '')}`;
+      if (avgComplexity > 25) baseName = `Complex ${baseName}`;
+      else if (avgComplexity < 5) baseName = `Simple ${baseName}`;
+    }
+
+    return baseName;
+  }
+
+  private getClusterContext(files: FileAnalysis[]): string | null {
+    const paths = files.map(f => f.path.toLowerCase());
+    
+    // Look for common directory patterns
+    const contexts = [
+      { keywords: ['admin', 'dashboard'], name: 'Admin' },
+      { keywords: ['auth', 'login', 'signin'], name: 'Authentication' },
+      { keywords: ['user', 'profile', 'account'], name: 'User Management' },
+      { keywords: ['payment', 'billing', 'checkout'], name: 'Payment' },
+      { keywords: ['chat', 'message', 'notification'], name: 'Communication' },
+      { keywords: ['search', 'filter', 'sort'], name: 'Search & Filter' },
+      { keywords: ['upload', 'file', 'media'], name: 'File Management' },
+      { keywords: ['report', 'analytics', 'stats'], name: 'Analytics' },
+      { keywords: ['security', 'encrypt', 'hash'], name: 'Security' },
+      { keywords: ['database', 'model', 'schema'], name: 'Data Layer' }
+    ];
+
+    for (const context of contexts) {
+      const matches = paths.filter(path => 
+        context.keywords.some(keyword => path.includes(keyword))
+      );
+      
+      if (matches.length >= Math.ceil(files.length * 0.6)) { // 60% of files match
+        return context.name;
+      }
+    }
+
+    return null;
+  }
+
+  private inferClusterPurpose(files: FileAnalysis[], type: string): string {
+    const purposes: Record<string, string> = {
+      'component': 'User interface components and layouts',
+      'page': 'Application pages and route handlers',
+      'api': 'API endpoints and request handlers',
+      'service': 'Business logic and external integrations',
+      'utility': 'Helper functions and common utilities',
+      'hook': 'React hooks for state and side effects',
+      'test': 'Test cases and testing utilities',
+      'config': 'Application configuration and constants',
+      'type': 'TypeScript type definitions and interfaces',
+      'style': 'CSS styles and theme definitions',
+      'generic': 'Core application logic and modules'
+    };
+
+    return purposes[type] || 'General functionality';
+  }
+
+  private splitByRelationships(files: FileAnalysis[], depGraph: Record<string, string[]>, maxSize: number): FileAnalysis[][] {
+    const clusters: FileAnalysis[][] = [];
+    const visited = new Set<string>();
+    
+    for (const file of files) {
+      if (visited.has(file.path)) continue;
+      
+      const cluster = this.growClusterByType(file, files, depGraph, visited, maxSize);
+      if (cluster.length > 0) {
+        clusters.push(cluster);
+      }
+    }
+    
+    return clusters;
+  }
+
+  private growClusterByType(startFile: FileAnalysis, allFiles: FileAnalysis[], depGraph: Record<string, string[]>, visited: Set<string>, maxSize: number): FileAnalysis[] {
+    const cluster: FileAnalysis[] = [];
+    const queue: FileAnalysis[] = [startFile];
     const inCluster = new Set<string>();
+    const fileMap = new Map(allFiles.map(f => [f.path, f]));
 
     while (queue.length > 0 && cluster.length < maxSize) {
       const current = queue.shift()!;
       
-      if (visited.has(current) || inCluster.has(current)) continue;
+      if (visited.has(current.path) || inCluster.has(current.path)) continue;
       
       cluster.push(current);
-      visited.add(current);
-      inCluster.add(current);
+      visited.add(current.path);
+      inCluster.add(current.path);
 
-      // Add connected files
-      const deps = depGraph[current] || [];
+      // Add connected files of the same type
+      const deps = depGraph[current.path] || [];
       deps.forEach(dep => {
-        if (!visited.has(dep) && !inCluster.has(dep) && cluster.length < maxSize) {
-          queue.push(dep);
+        const depFile = fileMap.get(dep);
+        if (depFile && depFile.type === startFile.type && 
+            !visited.has(dep) && !inCluster.has(dep) && cluster.length < maxSize) {
+          queue.push(depFile);
         }
       });
 
-      // Add reverse dependencies
-      Object.entries(depGraph).forEach(([file, fileDeps]) => {
-        if (fileDeps.includes(current) && !visited.has(file) && !inCluster.has(file) && cluster.length < maxSize) {
+      // Add reverse dependencies of the same type
+      Object.entries(depGraph).forEach(([filePath, fileDeps]) => {
+        const file = fileMap.get(filePath);
+        if (file && file.type === startFile.type && 
+            fileDeps.includes(current.path) && 
+            !visited.has(filePath) && !inCluster.has(filePath) && cluster.length < maxSize) {
           queue.push(file);
         }
       });
     }
 
     return cluster;
+  }
+
+  private groupRemainingFiles(files: FileAnalysis[], depGraph: Record<string, string[]>, maxSize: number): ClusterResult[] {
+    const clusters: ClusterResult[] = [];
+    const visited = new Set<string>();
+
+    // Group by directory proximity
+    const dirGroups = new Map<string, FileAnalysis[]>();
+    
+    files.forEach(file => {
+      if (visited.has(file.path)) return;
+      
+      const dir = dirname(file.path);
+      const parentDir = dirname(dir);
+      const groupKey = parentDir === '.' ? dir : parentDir;
+      
+      if (!dirGroups.has(groupKey)) {
+        dirGroups.set(groupKey, []);
+      }
+      dirGroups.get(groupKey)!.push(file);
+    });
+
+    // Create clusters from directory groups
+    for (const [dir, groupFiles] of dirGroups) {
+      if (groupFiles.length <= maxSize) {
+        const cluster = this.createCluster(groupFiles, 'generic', depGraph);
+        if (cluster) {
+          cluster.id = `${basename(dir)} Modules`;
+          clusters.push(cluster);
+          groupFiles.forEach(f => visited.add(f.path));
+        }
+      } else {
+        // Split large directory groups
+        const chunks = this.chunkArray(groupFiles, maxSize);
+        chunks.forEach((chunk, index) => {
+          const cluster = this.createCluster(chunk, 'generic', depGraph, index);
+          if (cluster) {
+            cluster.id = `${basename(dir)} Modules ${index + 1}`;
+            clusters.push(cluster);
+            chunk.forEach(f => visited.add(f.path));
+          }
+        });
+      }
+    }
+
+    return clusters;
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 
   private countClusterConnections(cluster: string[], depGraph: Record<string, string[]>): number {
