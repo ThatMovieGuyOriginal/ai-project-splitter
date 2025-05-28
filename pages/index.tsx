@@ -568,26 +568,38 @@ const ModernAnalyzerPage = () => {
                 {activeTab === 'upload' ? (
                   <ModernFileUploader onAnalyze={handleFileAnalysis} loading={loading} />
                 ) : (
-                  <div className="space-y-6 max-w-lg mx-auto">
-                    <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Analysis Complete!</h2>
-                    <p className="text-gray-600">
-                      {analysisResult.files.length} files analyzed • {analysisResult.clusters.length} clusters identified
-                      {analysisResult.extractionInfo && (
-                        <span> • {analysisResult.extractionInfo.extractedFiles} files extracted from {analysisResult.extractionInfo.archiveName}</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-green-600">
-                    {analysisResult.globalMetrics.averageComplexity <= 10 ? 'A' :
-                     analysisResult.globalMetrics.averageComplexity <= 20 ? 'B' :
-                     analysisResult.globalMetrics.averageComplexity <= 35 ? 'C' :
-                     analysisResult.globalMetrics.averageComplexity <= 50 ? 'D' : 'F'}
-                  </div>
-                  <div className="text-sm text-gray-600">Overall Grade</div>
-                </div>
+                  <>
+                    <div className="space-y-6 max-w-lg mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">Analysis Complete!</h2>
+                        <p className="text-gray-600">
+                          {analysisResult.files.length} files analyzed • {analysisResult.clusters.length} clusters identified
+                          {analysisResult.extractionInfo && (
+                            <span>
+                              {' '}
+                              • {analysisResult.extractionInfo.extractedFiles} files extracted from{' '}
+                              {analysisResult.extractionInfo.archiveName}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-green-600">
+                        {analysisResult.globalMetrics.averageComplexity <= 10
+                          ? 'A'
+                          : analysisResult.globalMetrics.averageComplexity <= 20
+                          ? 'B'
+                          : analysisResult.globalMetrics.averageComplexity <= 35
+                          ? 'C'
+                          : analysisResult.globalMetrics.averageComplexity <= 50
+                          ? 'D'
+                          : 'F'}
+                      </div>
+                      <div className="text-sm text-gray-600">Overall Grade</div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
