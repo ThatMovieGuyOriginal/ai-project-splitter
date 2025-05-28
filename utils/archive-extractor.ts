@@ -1,6 +1,6 @@
 // utils/archive-extractor.ts
-import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, writeFile, readFileSync } from 'fs/promises';
+import { createReadStream, createWriteStream, readFileSync } from 'fs';
+import { mkdir, writeFile } from 'fs/promises';
 import { join, resolve, dirname } from 'path';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
@@ -108,7 +108,7 @@ export class UniversalArchiveExtractor {
     } catch (error) {
       // Fallback to buffer-based parsing if ADM-ZIP fails
       console.warn('ADM-ZIP extraction failed, trying buffer-based parsing:', error);
-      const buffer = await readFileSync(archivePath);
+      const buffer = readFileSync(archivePath);
       return this.parseZipBuffer(buffer, outputDir);
     }
   }
