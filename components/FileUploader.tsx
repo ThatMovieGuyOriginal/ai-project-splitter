@@ -1,7 +1,6 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, X, Folder, Github } from 'lucide-react';
 
-// Add proper type definition for props
 interface ModernFileUploaderProps {
   onAnalyze: (file: File) => Promise<void>;
   loading: boolean;
@@ -167,15 +166,15 @@ const ModernFileUploader: React.FC<ModernFileUploaderProps> = ({ onAnalyze, load
     let classes = 'relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 cursor-pointer ';
     
     if (uploadStatus === 'uploading') {
-      classes += 'border-blue-300 bg-blue-50/50 cursor-not-allowed ';
+      classes += 'border-blue-300 bg-blue-50 cursor-not-allowed ';
     } else if (uploadStatus === 'success') {
-      classes += 'border-green-300 bg-green-50/50 ';
+      classes += 'border-green-300 bg-green-50 ';
     } else if (uploadStatus === 'error' || error) {
-      classes += 'border-red-300 bg-red-50/50 ';
+      classes += 'border-red-300 bg-red-50 ';
     } else if (dragActive) {
-      classes += 'border-blue-400 bg-blue-50/30 scale-[1.02] ';
+      classes += 'border-blue-400 bg-blue-50 scale-[1.02] ';
     } else {
-      classes += 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/20 ';
+      classes += 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 ';
     }
     
     return classes;
