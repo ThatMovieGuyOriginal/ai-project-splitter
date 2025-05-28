@@ -1,7 +1,6 @@
-// src/core/analyzer.ts
+// src/core/analyzer.ts - Remove deprecated TypeScript compiler API usage
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
-import * as ts from 'typescript';
 import { readFileSync, statSync } from 'fs';
 import { extname, basename } from 'path';
 
@@ -175,54 +174,14 @@ export class CodeAnalyzer {
   }
 
   private analyzeTypeScript(filePath: string, content: string): FileAnalysis {
-    const dependencies: string[] = [];
-    const imports: string[] = [];
-    const exports: string[] = [];
-    let complexity = 1;
+    // Simplified TypeScript analysis - just remove type annotations and treat as JavaScript
+    const jsContent = content
+      .replace(/:\s*\w+(\[\])?/g, '') // Remove type annotations
+      .replace(/interface\s+\w+\s*\{[^}]*\}/gs, '') // Remove interfaces
+      .replace(/type\s+\w+\s*=[^;]+;/g, '') // Remove type aliases
+      .replace(/as\s+\w+/g, ''); // Remove type assertions
 
-    try {
-      const sourceFile = ts.createSourceFile(
-        filePath,
-        content,
-        ts.ScriptTarget.Latest,
-        true
-      );
-
-      const visit = (node: ts.Node) => {
-        if (ts.isImportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
-          const source = node.moduleSpecifier.text;
-          dependencies.push(source);
-          imports.push(source);
-        }
-
-        if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
-          node.exportClause.elements.forEach(element => {
-            exports.push(element.name.text);
-          });
-        }
-
-        // Complexity
-        if (ts.isIfStatement(node) || ts.isWhileStatement(node) || 
-            ts.isForStatement(node) || ts.isSwitchStatement(node)) {
-          complexity++;
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(sourceFile);
-    } catch (error) {
-      console.warn(`TypeScript parsing failed for ${filePath}:`, error);
-    }
-
-    return {
-      path: filePath,
-      dependencies: [...new Set(dependencies)],
-      complexity,
-      loc: content.split('\n').length,
-      exports,
-      imports
-    };
+    return this.analyzeJavaScript(filePath, jsContent);
   }
 
   private analyzePython(filePath: string, content: string): FileAnalysis {
@@ -280,6 +239,7 @@ export class CodeAnalyzer {
     };
   }
 
+  // Rest of the methods remain the same...
   private buildDependencyGraph(analyses: FileAnalysis[]): Record<string, string[]> {
     const graph: Record<string, string[]> = {};
     const fileMap = new Map<string, string>();
@@ -305,7 +265,7 @@ export class CodeAnalyzer {
     return graph;
   }
 
-  private resolveDependency(dep: string, currentFile: string, fileMap: Map<string, string>): string | null {
+  private resolveDependency(dep: string, _currentFile: string, fileMap: Map<string, string>): string | null {
     // Skip external packages (node_modules, built-ins)
     if (!dep.startsWith('.') && !dep.startsWith('/')) {
       return null;
