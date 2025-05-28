@@ -52,19 +52,57 @@ export class UniversalArchiveExtractor {
   }
 
   private async extractZip(archivePath: string, outputDir: string): Promise<string[]> {
-    // For ZIP files, we'll use a simple implementation
-    // In a production environment, you'd want to use a proper ZIP library like 'yauzl' or 'node-stream-zip'
-    
-    // For now, let's implement a basic ZIP parser
-    const fs = await import('fs');
-    const buffer = fs.readFileSync(archivePath);
-    
-    // ZIP file signature check
-    if (buffer.length < 4 || buffer.readUInt32LE(0) !== 0x04034b50) {
-      throw new Error('Invalid ZIP file signature');
-    }
+    // Use ADM-ZIP for reliable ZIP extraction
+    try {
+      const AdmZip = (await import('adm-zip')).default;
+      const zip = new AdmZip(archivePath);
+      const entries = zip.getEntries();
+      const files: string[] = [];
+      
+      let totalSize = 0;
+      let fileCount = 0;
 
-    return this.parseZipBuffer(buffer, outputDir);
+      for (const entry of entries) {
+        // Security checks
+        if (++fileCount > this.maxFiles) {
+          throw new Error(`Too many files in archive (max ${this.maxFiles})`);
+        }
+
+        if (entry.header.size > this.maxFileSize) {
+          throw new Error(`File too large: ${entry.entryName} (${entry.header.size} bytes)`);
+        }
+
+        totalSize += entry.header.size;
+        if (totalSize > this.maxTotalSize) {
+          throw new Error(`Archive too large (max ${this.maxTotalSize} bytes)`);
+        }
+
+        // Security: Prevent path traversal
+        const safePath = this.sanitizePath(entry.entryName);
+        const outputPath = resolve(join(outputDir, safePath));
+        
+        if (!outputPath.startsWith(resolve(outputDir))) {
+          console.warn(`Skipping potentially dangerous path: ${entry.entryName}`);
+          continue;
+        }
+
+        if (!entry.isDirectory) {
+          try {
+            // Extract the file
+            zip.extractEntryTo(entry, outputDir, false, true, false, safePath);
+            files.push(outputPath);
+          } catch (error) {
+            console.warn(`Failed to extract ${entry.entryName}:`, error);
+          }
+        }
+      }
+
+      return files;
+    } catch (error) {
+      // Fallback to buffer-based parsing if ADM-ZIP fails
+      console.warn('ADM-ZIP extraction failed, trying buffer-based parsing:', error);
+      return this.parseZipBufferFallback(archivePath, outputDir);
+    }
   }
 
   private async parseZipBuffer(buffer: Buffer, outputDir: string): Promise<string[]> {
