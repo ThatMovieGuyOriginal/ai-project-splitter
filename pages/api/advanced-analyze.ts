@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import { AdvancedCodeAnalyzer } from '../../src/core/advanced-analyzer';
 import { SecurityScanner } from '../../src/security/scanner';
+import { archiveExtractor } from '../../utils/archive-extractor';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
@@ -95,8 +96,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     tempDir = await mkdtemp(join(tmpdir(), 'advanced-analyzer-'));
     algorithmsUsed.push('TempDirectory-Creation');
 
-    // Extract archive with validation
-    await extractArchiveAdvanced(file.filepath, tempDir);
+    // Extract archive with validation using original filename
+    await archiveExtractor.extractArchive(file.filepath, tempDir, file.originalFilename || undefined);
     algorithmsUsed.push('Archive-Extraction');
 
     // Enhanced security scanning
@@ -167,54 +168,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 }
 
-async function extractArchiveAdvanced(archivePath: string, outputDir: string): Promise<void> {
-  const { createReadStream, createWriteStream } = await import('fs');
-  const { pipeline } = await import('stream/promises');
-  const { createGunzip } = await import('zlib');
-  const { extract } = await import('tar-stream');
-  const { join, resolve, relative } = await import('path');
-  const { mkdir } = await import('fs/promises');
-
-  const readStream = createReadStream(archivePath);
-  
-  if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-    const gunzip = createGunzip();
-    const extractor = extract();
-    
-    extractor.on('entry', async (header, stream, next) => {
-      try {
-        if (header.type === 'file') {
-          const outputPath = resolve(join(outputDir, header.name));
-          
-          // Security: Prevent path traversal attacks
-          const relativePath = relative(outputDir, outputPath);
-          if (relativePath.startsWith('..') || resolve(outputPath) !== outputPath) {
-            stream.resume();
-            return next();
-          }
-          
-          // Create directory structure
-          await mkdir(resolve(outputPath, '..'), { recursive: true });
-          
-          const writeStream = createWriteStream(outputPath);
-          await pipeline(stream, writeStream);
-        } else {
-          stream.resume();
-        }
-        next();
-      } catch (error) {
-        console.warn(`Failed to extract ${header.name}:`, error);
-        stream.resume();
-        next();
-      }
-    });
-
-    await pipeline(readStream, gunzip, extractor);
-  } else {
-    throw new Error('Advanced analyzer supports .tar.gz archives for maximum compatibility');
-  }
-}
-
 async function postProcessAnalysis(analysis: unknown, level: string): Promise<{ nodes: Record<string, unknown>, clusters: unknown[] }> {
   const processedNodes: Record<string, unknown> = {};
   
@@ -246,7 +199,7 @@ async function postProcessAnalysis(analysis: unknown, level: string): Promise<{ 
     }
 
     // Enhanced cluster information
-    const processedClusters = clusters.map((cluster: unknown, index: number) => {
+    const processedClusters = clusters.map((cluster: unknown) => {
       const clusterObj = cluster as Record<string, unknown>;
       return {
         ...clusterObj,
