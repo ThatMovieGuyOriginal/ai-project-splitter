@@ -79,9 +79,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create temporary directory with enhanced security
     tempDir = await mkdtemp(join(tmpdir(), 'llm-analyzer-'));
     
-    // Extract archive using universal extractor
+    // Extract archive using universal extractor with original filename
     console.log(`Extracting archive: ${file.originalFilename || 'unknown'}`);
-    const extractedFiles = await archiveExtractor.extractArchive(file.filepath, tempDir);
+    const extractedFiles = await archiveExtractor.extractArchive(
+      file.filepath, 
+      tempDir, 
+      file.originalFilename || undefined
+    );
     
     if (extractedFiles.length === 0) {
       throw new Error('No files were extracted from the archive');
@@ -124,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let status = 500;
       let errorMessage = error.message;
       
-      if (error.message.includes('Unsupported archive format')) {
+      if (error.message.includes('Unsupported archive format') || error.message.includes('Cannot detect archive type')) {
         status = 400;
         errorMessage = `${error.message}. Supported formats: ZIP, TAR, TAR.GZ, TGZ, GZ`;
       } else if (error.message.includes('too large') || error.message.includes('Too many')) {
