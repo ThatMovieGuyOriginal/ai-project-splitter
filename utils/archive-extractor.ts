@@ -1,10 +1,11 @@
 // utils/archive-extractor.ts
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, writeFile, readFileSync } from 'fs/promises';
 import { join, resolve, dirname } from 'path';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
 import { extract } from 'tar-stream';
+import * as zlib from 'zlib';
 
 interface ArchiveEntry {
   name: string;
@@ -54,7 +55,7 @@ export class UniversalArchiveExtractor {
   private async extractZip(archivePath: string, outputDir: string): Promise<string[]> {
     // Use ADM-ZIP for reliable ZIP extraction
     try {
-      const AdmZip = (await import('adm-zip')).default;
+      const { default: AdmZip } = await import('adm-zip');
       const zip = new AdmZip(archivePath);
       const entries = zip.getEntries();
       const files: string[] = [];
@@ -79,7 +80,7 @@ export class UniversalArchiveExtractor {
 
         // Security: Prevent path traversal
         const safePath = this.sanitizePath(entry.entryName);
-        const outputPath = resolve(join(outputDir, safePath));
+        const outputPath = resolve(outputDir, safePath);
         
         if (!outputPath.startsWith(resolve(outputDir))) {
           console.warn(`Skipping potentially dangerous path: ${entry.entryName}`);
@@ -107,8 +108,7 @@ export class UniversalArchiveExtractor {
     } catch (error) {
       // Fallback to buffer-based parsing if ADM-ZIP fails
       console.warn('ADM-ZIP extraction failed, trying buffer-based parsing:', error);
-      const fs = await import('fs');
-      const buffer = fs.readFileSync(archivePath);
+      const buffer = await readFileSync(archivePath);
       return this.parseZipBuffer(buffer, outputDir);
     }
   }
@@ -143,7 +143,7 @@ export class UniversalArchiveExtractor {
 
         // Security: Prevent path traversal
         const safePath = this.sanitizePath(entry.name);
-        const outputPath = resolve(join(outputDir, safePath));
+        const outputPath = resolve(outputDir, safePath);
         
         if (!outputPath.startsWith(resolve(outputDir))) {
           throw new Error(`Path traversal attempt: ${entry.name}`);
@@ -190,7 +190,6 @@ export class UniversalArchiveExtractor {
         // Deflate compression
         try {
           const compressed = buffer.subarray(dataStart, dataEnd);
-          const zlib = require('zlib');
           data = zlib.inflateRawSync(compressed);
         } catch (e) {
           console.warn(`Failed to decompress ${name}:`, e);
@@ -246,7 +245,7 @@ export class UniversalArchiveExtractor {
 
           if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
-            const outputPath = resolve(join(outputDir, safePath));
+            const outputPath = resolve(outputDir, safePath);
             
             // Security: Prevent path traversal
             if (!outputPath.startsWith(resolve(outputDir))) {
@@ -308,7 +307,7 @@ export class UniversalArchiveExtractor {
 
           if (header.type === 'file' && header.name) {
             const safePath = this.sanitizePath(header.name);
-            const outputPath = resolve(join(outputDir, safePath));
+            const outputPath = resolve(outputDir, safePath);
             
             if (!outputPath.startsWith(resolve(outputDir))) {
               stream.resume();
