@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     const [fields, files] = await form.parse(req);
     const file = Array.isArray(files.file) ? files.file[0] : files.file;
-    const analysisLevel = Array.isArray(fields.level) ? fields.level[0] : fields.level || 'standard';
+    const _analysisLevel = Array.isArray(fields.level) ? fields.level[0] : fields.level || 'standard';
 
     if (!file) {
       return res.status(400).json({ 
@@ -111,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     algorithmsUsed.push('Advanced-Graph-Analysis', 'Centrality-Computation', 'Multi-Algorithm-Clustering');
 
     // Post-process analysis for API response
-    const processedAnalysis = await postProcessAnalysis(projectAnalysis, analysisLevel);
+    const processedAnalysis = await postProcessAnalysis(projectAnalysis, _analysisLevel);
     algorithmsUsed.push('Post-Processing');
 
     // Generate intelligent recommendations
@@ -168,7 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 }
 
-async function postProcessAnalysis(analysis: unknown, level: string): Promise<{ nodes: Record<string, unknown>, clusters: unknown[] }> {
+async function postProcessAnalysis(analysis: unknown, _level: string): Promise<{ nodes: Record<string, unknown>, clusters: unknown[] }> {
   const processedNodes: Record<string, unknown> = {};
   
   // Convert Map to serializable object with enhanced data
@@ -367,7 +367,7 @@ function generateIntelligentRecommendations(analysis: unknown): string[] {
   return recommendations;
 }
 
-function performNetworkAnalysis(analysis: unknown): { centralityAnalysis: unknown[]; communityStructure: unknown; topologicalFeatures: unknown } {
+function performNetworkAnalysis(_analysis: unknown): { centralityAnalysis: unknown[]; communityStructure: unknown; topologicalFeatures: unknown } {
   return {
     centralityAnalysis: [],
     communityStructure: {},
@@ -375,7 +375,7 @@ function performNetworkAnalysis(analysis: unknown): { centralityAnalysis: unknow
   };
 }
 
-function optimizeForLLMContext(analysis: unknown): { contextChunks: unknown[]; tokenEstimates: unknown; loadingStrategy: unknown } {
+function optimizeForLLMContext(_analysis: unknown): { contextChunks: unknown[]; tokenEstimates: unknown; loadingStrategy: unknown } {
   return {
     contextChunks: [],
     tokenEstimates: {},
