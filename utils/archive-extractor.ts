@@ -227,11 +227,11 @@ export class UniversalArchiveExtractor {
             return reject(new Error(`Too many files in archive (max ${this.maxFiles})`));
           }
 
-          if (header.size > this.maxFileSize) {
+          if (header.size && header.size > this.maxFileSize) {
             return reject(new Error(`File too large: ${header.name} (${header.size} bytes)`));
           }
 
-          totalSize += header.size;
+          totalSize += header.size || 0;
           if (totalSize > this.maxTotalSize) {
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
@@ -286,11 +286,11 @@ export class UniversalArchiveExtractor {
             return reject(new Error(`Too many files in archive (max ${this.maxFiles})`));
           }
 
-          if (header.size > this.maxFileSize) {
+          if (header.size && header.size > this.maxFileSize) {
             return reject(new Error(`File too large: ${header.name} (${header.size} bytes)`));
           }
 
-          totalSize += header.size;
+          totalSize += header.size || 0;
           if (totalSize > this.maxTotalSize) {
             return reject(new Error(`Archive too large (max ${this.maxTotalSize} bytes)`));
           }
