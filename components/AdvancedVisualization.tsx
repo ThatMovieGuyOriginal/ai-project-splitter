@@ -687,7 +687,7 @@ const EnhancedVisualization: React.FC<VisualizationProps> = ({
               </>
             )}
           </div>
-        </div
+        </div>
       </div>
     </div>
   );
