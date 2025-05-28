@@ -361,13 +361,13 @@ const EnhancedVisualization: React.FC<VisualizationProps> = ({
 
         // Expand hull slightly
         const centroid = d3.polygonCentroid(hull);
-        const expandedHull = hull.map(point => {
+        const expandedHull: [number, number][] = hull.map(point => {
           const dx = point[0] - centroid[0];
           const dy = point[1] - centroid[1];
           return [
             centroid[0] + dx * 1.2,
             centroid[1] + dy * 1.2
-          ];
+          ] as [number, number];
         });
 
         hullContainer.selectAll(`path.hull-${cluster.id}`)
