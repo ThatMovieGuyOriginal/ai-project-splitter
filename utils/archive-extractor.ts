@@ -20,7 +20,9 @@ export class UniversalArchiveExtractor {
   private readonly maxFiles = 1000;
 
   async extractArchive(archivePath: string, outputDir: string, originalFilename?: string): Promise<string[]> {
-    const archiveType = this.detectArchiveType(originalFilename || archivePath);
+    // Use original filename for type detection if provided, otherwise use archive path
+    const filenameForDetection = originalFilename || archivePath;
+    const archiveType = this.detectArchiveType(filenameForDetection);
     
     switch (archiveType) {
       case 'zip':
