@@ -909,8 +909,11 @@ const ModernAnalyzerPage = () => {
                 </div>
               </div>
             </div>
+              
           </div>
-        )}
+        </>
+      ) : (
+        <>
       </div>
     </div>
   );
