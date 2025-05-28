@@ -1,7 +1,7 @@
 // utils/archive-extractor.ts
 import { createReadStream, createWriteStream, readFileSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { join, resolve, dirname } from 'path';
+import { join, resolve as resolvePath, dirname } from 'path';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
 import { extract } from 'tar-stream';
@@ -83,8 +83,8 @@ export class UniversalArchiveExtractor {
         const outputPath = join(outputDir, safePath);
         
         // Security check: ensure the resolved path is within outputDir
-        const resolvedOutputPath = resolve(outputPath);
-        const resolvedOutputDir = resolve(outputDir);
+        const resolvedOutputPath = resolvePath(outputPath);
+        const resolvedOutputDir = resolvePath(outputDir);
         if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
           console.warn(`Skipping potentially dangerous path: ${entry.entryName}`);
           continue;
@@ -149,8 +149,8 @@ export class UniversalArchiveExtractor {
         const outputPath = join(outputDir, safePath);
         
         // Security check: ensure the resolved path is within outputDir
-        const resolvedOutputPath = resolve(outputPath);
-        const resolvedOutputDir = resolve(outputDir);
+        const resolvedOutputPath = resolvePath(outputPath);
+        const resolvedOutputDir = resolvePath(outputDir);
         if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
           throw new Error(`Path traversal attempt: ${entry.name}`);
         }
@@ -254,8 +254,8 @@ export class UniversalArchiveExtractor {
             const outputPath = join(outputDir, safePath);
             
             // Security: Prevent path traversal
-            const resolvedOutputPath = resolve(outputPath);
-            const resolvedOutputDir = resolve(outputDir);
+            const resolvedOutputPath = resolvePath(outputPath);
+            const resolvedOutputDir = resolvePath(outputDir);
             if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
               stream.resume();
               return next();
@@ -318,8 +318,8 @@ export class UniversalArchiveExtractor {
             const outputPath = join(outputDir, safePath);
             
             // Security: Prevent path traversal
-            const resolvedOutputPath = resolve(outputPath);
-            const resolvedOutputDir = resolve(outputDir);
+            const resolvedOutputPath = resolvePath(outputPath);
+            const resolvedOutputDir = resolvePath(outputDir);
             if (!resolvedOutputPath.startsWith(resolvedOutputDir)) {
               stream.resume();
               return next();
