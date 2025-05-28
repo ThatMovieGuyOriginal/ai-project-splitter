@@ -352,7 +352,7 @@ const EnhancedVisualization: React.FC<VisualizationProps> = ({
 
         const points = clusterNodes
           .filter(n => (n as any).x !== undefined && (n as any).y !== undefined)
-          .map(n => [(n as any).x, (n as any).y]);
+          .map(n => [(n as any).x, (n as any).y] as [number, number]);
 
         if (points.length < 3) return;
 
