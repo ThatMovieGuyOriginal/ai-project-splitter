@@ -101,7 +101,9 @@ export class UniversalArchiveExtractor {
     } catch (error) {
       // Fallback to buffer-based parsing if ADM-ZIP fails
       console.warn('ADM-ZIP extraction failed, trying buffer-based parsing:', error);
-      return this.parseZipBufferFallback(archivePath, outputDir);
+      const fs = await import('fs');
+      const buffer = fs.readFileSync(archivePath);
+      return this.parseZipBuffer(buffer, outputDir);
     }
   }
 
@@ -143,11 +145,12 @@ export class UniversalArchiveExtractor {
 
         if (entry.type === 'file' && entry.data) {
           await mkdir(dirname(outputPath), { recursive: true });
+          const fs = await import('fs');
           await fs.promises.writeFile(outputPath, entry.data);
           files.push(outputPath);
         }
 
-        offset += entry.totalSize;
+        offset += (entry as any).totalSize;
       } else {
         // Try to find next valid signature
         offset++;
