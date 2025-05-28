@@ -2,19 +2,50 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, Settings } from 'lucide-react';
 
-const EnhancedVisualization = ({ 
+// Add proper type definitions
+interface VisualizationProps {
+  nodes?: Record<string, {
+    path: string;
+    weight: number;
+    complexity: { grade: string; risk: string };
+    centrality: { betweenness: number; pagerank: number };
+    dependencies: string[];
+    clusterAssignment: string;
+  }>;
+  clusters?: Array<{
+    id: string;
+    nodes: string[];
+    cohesion: number;
+    coupling: number;
+    size: number;
+    complexity: string;
+    quality: string;
+  }>;
+  globalMetrics?: {
+    modularityScore: number;
+    networkDensity: number;
+    clusteringCoefficient: number;
+    averagePathLength: number;
+    totalComplexity: number;
+    averageComplexity: number;
+  };
+  onNodeSelect?: (nodeId: string) => void;
+  onClusterSelect?: (clusterId: string) => void;
+}
+
+const EnhancedVisualization: React.FC<VisualizationProps> = ({ 
   nodes = {}, 
   clusters = [], 
   globalMetrics = {},
   onNodeSelect,
   onClusterSelect 
 }) => {
-  const svgRef = useRef(null);
-  const containerRef = useRef(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [selectedCluster, setSelectedCluster] = useState(null);
-  const [viewMode, setViewMode] = useState('network');
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'network' | 'complexity' | 'centrality' | 'risk'>('network');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -28,10 +59,16 @@ const EnhancedVisualization = ({
       centrality: data.centrality || { betweenness: Math.random(), pagerank: Math.random() },
       clusterId: data.clusterAssignment || `cluster-${Math.floor(Math.random() * 4)}`,
       dependencies: Array.isArray(data.dependencies) ? data.dependencies : [],
-      type: data.type || 'file'
+      type: 'file' as const
     }));
 
-    const links = [];
+    const links: Array<{
+      source: string;
+      target: string;
+      weight: number;
+      type: string;
+    }> = [];
+    
     nodeArray.forEach(source => {
       source.dependencies.forEach(targetId => {
         const target = nodeArray.find(n => n.id === targetId || n.path.includes(targetId));
@@ -51,7 +88,7 @@ const EnhancedVisualization = ({
 
   // Color schemes
   const colorSchemes = {
-    network: d3.scaleOrdinal()
+    network: d3.scaleOrdinal<string>()
       .domain(['cluster-0', 'cluster-1', 'cluster-2', 'cluster-3'])
       .range(['#3b82f6', '#10b981', '#f59e0b', '#ef4444']),
     complexity: d3.scaleSequential()
@@ -60,7 +97,7 @@ const EnhancedVisualization = ({
     centrality: d3.scaleSequential()
       .domain([0, 1])
       .interpolator(d3.interpolateBlues),
-    risk: d3.scaleOrdinal()
+    risk: d3.scaleOrdinal<string>()
       .domain(['low', 'medium', 'high', 'critical'])
       .range(['#10b981', '#f59e0b', '#ef4444', '#7c2d12'])
   };
@@ -99,7 +136,7 @@ const EnhancedVisualization = ({
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
     // Zoom behavior
-    const zoom = d3.zoom()
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
@@ -135,41 +172,41 @@ const EnhancedVisualization = ({
       const baseColor = getNodeColor(node, viewMode);
       gradient.append('stop')
         .attr('offset', '0%')
-        .attr('stop-color', d3.color(baseColor).brighter(1));
+        .attr('stop-color', d3.color(baseColor)!.brighter(1).toString());
       gradient.append('stop')
         .attr('offset', '70%')
         .attr('stop-color', baseColor);
       gradient.append('stop')
         .attr('offset', '100%')
-        .attr('stop-color', d3.color(baseColor).darker(0.5));
+        .attr('stop-color', d3.color(baseColor)!.darker(0.5).toString());
     });
 
     // Size scales
     const nodeSize = d3.scaleSqrt()
-      .domain(d3.extent(processedData.nodes, d => d.weight))
+      .domain(d3.extent(processedData.nodes, d => d.weight) as [number, number])
       .range([8, 40]);
 
     const linkWidth = d3.scaleLinear()
-      .domain(d3.extent(processedData.links, d => d.weight))
+      .domain(d3.extent(processedData.links, d => d.weight) as [number, number])
       .range([1, 4]);
 
     // Force simulation
-    const simulation = d3.forceSimulation(processedData.nodes)
-      .force('link', d3.forceLink(processedData.links)
-        .id(d => d.id)
-        .distance(d => 80 + (1 - d.weight) * 50)
+    const simulation = d3.forceSimulation(processedData.nodes as any)
+      .force('link', d3.forceLink(processedData.links as any)
+        .id((d: any) => d.id)
+        .distance((d: any) => 80 + (1 - d.weight) * 50)
         .strength(0.3))
       .force('charge', d3.forceManyBody()
-        .strength(d => -300 - nodeSize(d.weight) * 5))
+        .strength((d: any) => -300 - nodeSize(d.weight) * 5))
       .force('center', d3.forceCenter(innerWidth / 2, innerHeight / 2))
       .force('collision', d3.forceCollide()
-        .radius(d => nodeSize(d.weight) + 5)
+        .radius((d: any) => nodeSize(d.weight) + 5)
         .strength(0.7))
       .force('x', d3.forceX(innerWidth / 2).strength(0.05))
       .force('y', d3.forceY(innerHeight / 2).strength(0.05));
 
     // Add cluster forces for better grouping
-    const clusterCenters = {};
+    const clusterCenters: Record<string, { x: number; y: number }> = {};
     clusters.forEach((cluster, i) => {
       const angle = (i / clusters.length) * 2 * Math.PI;
       const radius = Math.min(innerWidth, innerHeight) * 0.25;
@@ -194,7 +231,7 @@ const EnhancedVisualization = ({
       .data(processedData.links)
       .enter().append('line')
       .attr('stroke', '#cbd5e1')
-      .attr('stroke-width', d => linkWidth(d.weight))
+      .attr('stroke-width', (d: any) => linkWidth(d.weight))
       .attr('stroke-opacity', 0.6)
       .style('filter', 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))')
       .on('mouseover', function(event, d) {
@@ -216,7 +253,7 @@ const EnhancedVisualization = ({
       .enter().append('g')
       .attr('class', 'node')
       .style('cursor', 'pointer')
-      .call(d3.drag()
+      .call(d3.drag<any, any>()
         .on('start', dragstarted)
         .on('drag', dragged)
         .on('end', dragended));
@@ -224,22 +261,22 @@ const EnhancedVisualization = ({
     // Outer ring for complexity indication
     node.append('circle')
       .attr('class', 'outer-ring')
-      .attr('r', d => nodeSize(d.weight) + 4)
+      .attr('r', (d: any) => nodeSize(d.weight) + 4)
       .attr('fill', 'none')
-      .attr('stroke', d => colorSchemes.risk(d.complexity.risk))
+      .attr('stroke', (d: any) => colorSchemes.risk(d.complexity.risk))
       .attr('stroke-width', 2)
       .attr('stroke-opacity', 0.6)
-      .attr('stroke-dasharray', d => d.complexity.risk === 'critical' ? '3,3' : 'none');
+      .attr('stroke-dasharray', (d: any) => d.complexity.risk === 'critical' ? '3,3' : 'none');
 
     // Main node circles
     node.append('circle')
       .attr('class', 'main-circle')
-      .attr('r', d => nodeSize(d.weight))
-      .attr('fill', d => `url(#gradient-${d.id.replace(/[^a-zA-Z0-9]/g, '-')})`)
+      .attr('r', (d: any) => nodeSize(d.weight))
+      .attr('fill', (d: any) => `url(#gradient-${d.id.replace(/[^a-zA-Z0-9]/g, '-')})`)
       .attr('stroke', '#ffffff')
       .attr('stroke-width', 2)
       .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))')
-      .on('mouseover', function(event, d) {
+      .on('mouseover', function(event, d: any) {
         // Highlight effect
         d3.select(this)
           .transition()
@@ -249,14 +286,14 @@ const EnhancedVisualization = ({
 
         // Highlight connected links
         link
-          .attr('stroke-opacity', l => 
+          .attr('stroke-opacity', (l: any) => 
             (l.source.id === d.id || l.target.id === d.id) ? 0.8 : 0.2)
-          .attr('stroke', l => 
+          .attr('stroke', (l: any) => 
             (l.source.id === d.id || l.target.id === d.id) ? '#3b82f6' : '#cbd5e1');
 
         showTooltip(event, d);
       })
-      .on('mouseout', function(event, d) {
+      .on('mouseout', function(event, d: any) {
         d3.select(this)
           .transition()
           .duration(200)
@@ -270,7 +307,7 @@ const EnhancedVisualization = ({
 
         hideTooltip();
       })
-      .on('click', (event, d) => {
+      .on('click', (event, d: any) => {
         setSelectedNode(d.id === selectedNode ? null : d.id);
         onNodeSelect?.(d.id);
       });
@@ -280,11 +317,11 @@ const EnhancedVisualization = ({
       .attr('class', 'node-icon')
       .attr('text-anchor', 'middle')
       .attr('dy', '.35em')
-      .attr('font-size', d => Math.max(8, nodeSize(d.weight) * 0.4))
+      .attr('font-size', (d: any) => Math.max(8, nodeSize(d.weight) * 0.4))
       .attr('font-weight', '600')
       .attr('fill', '#ffffff')
       .style('pointer-events', 'none')
-      .text(d => getFileIcon(d.path));
+      .text((d: any) => getFileIcon(d.path));
 
     // Node labels (show for important nodes)
     const labels = g.append('g').attr('class', 'labels');
@@ -298,12 +335,12 @@ const EnhancedVisualization = ({
       .enter().append('text')
       .attr('class', 'node-label')
       .attr('text-anchor', 'middle')
-      .attr('dy', d => nodeSize(d.weight) + 15)
+      .attr('dy', (d: any) => nodeSize(d.weight) + 15)
       .attr('font-size', '10px')
       .attr('font-weight', '500')
       .attr('fill', '#374151')
       .style('pointer-events', 'none')
-      .text(d => d.path.split('/').pop() || d.id);
+      .text((d: any) => d.path.split('/').pop() || d.id);
 
     // Cluster hulls (convex hull around cluster nodes)
     const hullContainer = g.append('g').attr('class', 'hulls');
@@ -314,8 +351,8 @@ const EnhancedVisualization = ({
         if (clusterNodes.length < 3) return;
 
         const points = clusterNodes
-          .filter(n => n.x !== undefined && n.y !== undefined)
-          .map(n => [n.x, n.y]);
+          .filter(n => (n as any).x !== undefined && (n as any).y !== undefined)
+          .map(n => [(n as any).x, (n as any).y]);
 
         if (points.length < 3) return;
 
@@ -355,41 +392,41 @@ const EnhancedVisualization = ({
     // Simulation tick function
     simulation.on('tick', () => {
       link
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
+        .attr('x1', (d: any) => d.source.x)
+        .attr('y1', (d: any) => d.source.y)
+        .attr('x2', (d: any) => d.target.x)
+        .attr('y2', (d: any) => d.target.y);
 
       node
-        .attr('transform', d => `translate(${d.x},${d.y})`);
+        .attr('transform', (d: any) => `translate(${d.x},${d.y})`);
 
       labels.selectAll('text')
-        .attr('x', d => d.x)
-        .attr('y', d => d.y);
+        .attr('x', (d: any) => d.x)
+        .attr('y', (d: any) => d.y);
 
       updateHulls();
     });
 
     // Drag functions
-    function dragstarted(event, d) {
+    function dragstarted(event: any, d: any) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event, d) {
+    function dragged(event: any, d: any) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event, d) {
+    function dragended(event: any, d: any) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;
     }
 
     // Helper functions
-    function getNodeColor(node, mode) {
+    function getNodeColor(node: any, mode: string) {
       switch (mode) {
         case 'complexity':
           return colorSchemes.complexity(node.weight);
@@ -402,9 +439,9 @@ const EnhancedVisualization = ({
       }
     }
 
-    function getFileIcon(path) {
+    function getFileIcon(path: string) {
       const ext = path.split('.').pop()?.toLowerCase();
-      const iconMap = {
+      const iconMap: Record<string, string> = {
         'ts': '⚡',
         'tsx': '⚛️',
         'js': '📜',
@@ -417,10 +454,10 @@ const EnhancedVisualization = ({
         'json': '📋',
         'md': '📝'
       };
-      return iconMap[ext] || '📄';
+      return iconMap[ext || ''] || '📄';
     }
 
-    function showTooltip(event, d) {
+    function showTooltip(event: MouseEvent, d: any) {
       const tooltip = d3.select('body').append('div')
         .attr('class', 'vis-tooltip')
         .style('position', 'absolute')
@@ -433,7 +470,7 @@ const EnhancedVisualization = ({
         .style('backdrop-filter', 'blur(10px)')
         .style('box-shadow', '0 10px 25px rgba(0,0,0,0.3)')
         .style('z-index', '1000')
-        .style('opacity', 0);
+        .style('opacity', '0');
 
       tooltip.html(`
         <div style="font-weight: 600; margin-bottom: 8px; color: #60a5fa;">
@@ -462,7 +499,7 @@ const EnhancedVisualization = ({
         .style('top', (event.pageY - 10) + 'px')
         .transition()
         .duration(200)
-        .style('opacity', 1);
+        .style('opacity', '1');
     }
 
     function hideTooltip() {
@@ -475,13 +512,13 @@ const EnhancedVisualization = ({
       d3.selectAll('.vis-tooltip').remove();
     };
 
-  }, [processedData, dimensions, viewMode, selectedNode, selectedCluster]);
+  }, [processedData, dimensions, viewMode, selectedNode, selectedCluster, clusters, onNodeSelect, onClusterSelect]);
 
   // Control functions
   const handleZoomIn = () => {
     const svg = d3.select(svgRef.current);
     svg.transition().call(
-      d3.zoom().transform,
+      d3.zoom<SVGSVGElement, unknown>().transform as any,
       d3.zoomIdentity.scale(Math.min(zoomLevel * 1.5, 4))
     );
   };
@@ -489,7 +526,7 @@ const EnhancedVisualization = ({
   const handleZoomOut = () => {
     const svg = d3.select(svgRef.current);
     svg.transition().call(
-      d3.zoom().transform,
+      d3.zoom<SVGSVGElement, unknown>().transform as any,
       d3.zoomIdentity.scale(Math.max(zoomLevel * 0.75, 0.1))
     );
   };
@@ -497,13 +534,15 @@ const EnhancedVisualization = ({
   const handleReset = () => {
     const svg = d3.select(svgRef.current);
     svg.transition().call(
-      d3.zoom().transform,
+      d3.zoom<SVGSVGElement, unknown>().transform as any,
       d3.zoomIdentity
     );
   };
 
   const handleDownload = () => {
     const svg = svgRef.current;
+    if (!svg) return;
+    
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svg);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
@@ -535,7 +574,7 @@ const EnhancedVisualization = ({
         {/* View Mode Selector */}
         <div className="flex items-center space-x-4">
           <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-            {['network', 'complexity', 'centrality', 'risk'].map(mode => (
+            {(['network', 'complexity', 'centrality', 'risk'] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -636,7 +675,7 @@ const EnhancedVisualization = ({
             )}
             {viewMode === 'risk' && (
               <>
-                {['low', 'medium', 'high', 'critical'].map(risk => (
+                {(['low', 'medium', 'high', 'critical'] as const).map(risk => (
                   <div key={risk} className="flex items-center space-x-2">
                     <div
                       className="w-4 h-4 rounded-full"
@@ -648,7 +687,7 @@ const EnhancedVisualization = ({
               </>
             )}
           </div>
-        </div>
+        </div
       </div>
     </div>
   );
