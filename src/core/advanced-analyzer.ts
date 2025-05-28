@@ -1,7 +1,7 @@
 // src/core/advanced-analyzer.ts
 import { Matrix, EigenvalueDecomposition } from 'ml-matrix';
 import { readFileSync, statSync } from 'fs';
-import { extname, basename, dirname, relative, join } from 'path';
+import { extname, basename, dirname, join } from 'path';
 import { glob } from 'glob';
 
 interface ComplexityMetrics {
