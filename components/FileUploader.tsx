@@ -29,7 +29,6 @@ const SUPPORTED_FORMATS = {
 
 export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [dragCounter, setDragCounter] = useState(0);
 
   const validateFile = useCallback((file: File): string | null => {
     // Size check (25MB limit)
@@ -51,7 +50,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }
     return null;
   }, []);
 
-  const onDrop = useCallback(async (acceptedFiles: File[], fileRejections: any[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[], fileRejections: Array<{ file: File; errors: Array<{ code: string; message: string }> }>) => {
     // Handle rejections
     if (fileRejections.length > 0) {
       const rejection = fileRejections[0];
@@ -108,8 +107,6 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }
     maxFiles: 1,
     maxSize: 25 * 1024 * 1024, // 25MB
     disabled: loading,
-    onDragEnter: () => setDragCounter(prev => prev + 1),
-    onDragLeave: () => setDragCounter(prev => Math.max(0, prev - 1)),
   });
 
   const getDropzoneClass = () => {
@@ -131,14 +128,6 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }
       return 'Drop your project archive here...';
     }
     return 'Drag & drop a project archive, or click to select';
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -197,8 +186,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onAnalyze, loading }
           <div className={styles.helpContent}>
             <h4>Creating a project archive:</h4>
             <ul>
-              <li><strong>Windows:</strong> Right-click folder → "Compress to ZIP file"</li>
-              <li><strong>macOS:</strong> Right-click folder → "Compress"</li>
+              <li><strong>Windows:</strong> Right-click folder → &quot;Compress to ZIP file&quot;</li>
+              <li><strong>macOS:</strong> Right-click folder → &quot;Compress&quot;</li>
               <li><strong>Linux:</strong> <code>tar -czf project.tar.gz project-folder/</code></li>
             </ul>
             <h4>What to include:</h4>
