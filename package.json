@@ -1,6 +1,6 @@
 {
-  "name": "llm-index-analyzer",
-  "version": "2.0.0",
+  "name": "codehealth-dashboard",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,12 +10,23 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "db:push": "drizzle-kit push:pg",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "next": "^14.2.29",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "next-auth": "^4.24.7",
+    "@auth/drizzle-adapter": "^0.3.6",
+    "drizzle-orm": "^0.29.0",
+    "@vercel/postgres": "^0.5.1",
+    "@vercel/blob": "^0.15.1",
+    "stripe": "^14.7.0",
+    "micro": "^10.0.1",
     "lucide-react": "^0.263.1",
     "@babel/parser": "^7.23.0",
     "@babel/traverse": "^7.23.0",
@@ -28,7 +39,13 @@
     "ml-matrix": "^6.10.7",
     "yauzl": "^3.0.0",
     "node-stream-zip": "^1.15.0",
-    "adm-zip": "^0.5.10"
+    "adm-zip": "^0.5.10",
+    "octokit": "^3.1.2",
+    "recharts": "^2.8.0",
+    "date-fns": "^2.30.0",
+    "react-hot-toast": "^2.4.1",
+    "framer-motion": "^10.16.5",
+    "react-confetti": "^6.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.5.0",
@@ -50,7 +67,8 @@
     "@testing-library/jest-dom": "^6.1.0",
     "tailwindcss": "^3.4.0",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "postcss": "^8.4.32",
+    "drizzle-kit": "^0.20.4"
   },
   "engines": {
     "node": ">=18.0.0"
